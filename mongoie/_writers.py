@@ -14,7 +14,7 @@ from mongoie.log import get_logger
 logger = get_logger(__name__)
 
 
-def to_json(stream: ChunkedDataStream, file_path: FilePath, **kwargs) -> None:
+def to_json(stream: ChunkedDataStream, file_path: FilePath) -> None:
     """Writes ChunkedDataStream data to a JSON file.
 
     ChunkedDataStream contains chunks of data which are yielded in lazy way.
@@ -25,13 +25,11 @@ def to_json(stream: ChunkedDataStream, file_path: FilePath, **kwargs) -> None:
     Args:
         stream: The ChunkedDataStream object.
         file_path: The path to the output JSON file.
-        **kwargs: Keyword arguments for the `open()` function.
-
     """
 
     logger.debug(f"writing mongo data to {file_path}")
     docs = 0
-    with open(file_path, "w", **kwargs) as file:
+    with open(file_path, "w") as file:
         file.write("[")
         for chunk_idx, chunk in enumerate(stream):
             logger.debug(f"writing idx: {chunk_idx} with {len(chunk)} documents")

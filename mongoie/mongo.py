@@ -4,7 +4,13 @@ from typing import Any, Dict, Optional, Sequence, Union
 
 from pymongo import MongoClient
 
-from mongoie.dtypes import MongoCursor, MongoDatabase, MongoCollection, MongoQuery, MongoPipeline
+from mongoie.dtypes import (
+    MongoCursor,
+    MongoDatabase,
+    MongoCollection,
+    MongoQuery,
+    MongoPipeline,
+)
 from mongoie.log import get_logger
 
 
@@ -124,4 +130,3 @@ class MongoConnector:
         **kwargs,
     ) -> MongoCursor:
         return self.db[collection].aggregate(pipeline or [], **kwargs)
-
