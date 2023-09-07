@@ -3,13 +3,12 @@ from typing import Any
 from bson import json_util
 
 from mongoie.dtypes import FilePath
+from mongoie.log import get_logger
 from mongoie.utils import (
     remove_last_character,
     write_closing_bracket,
     ChunkedDataStream,
 )
-from mongoie.log import get_logger
-
 
 logger = get_logger(__name__)
 

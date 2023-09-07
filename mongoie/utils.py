@@ -1,9 +1,10 @@
 import dataclasses
 import itertools
+from typing import Optional, Union, List, Iterable, Iterator, Any, Dict
 
-from dtypes import FilePath, MongoDocument
-from typing import Optional, Union, List, Iterable, Iterator, Any
 import pandas as pd
+
+from mongoie.dtypes import FilePath, MongoDocument
 
 
 def chunk_generator(iterable: Iterable, batch_size: int = 1000) -> Iterator[List[Any]]:
