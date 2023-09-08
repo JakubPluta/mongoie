@@ -1,6 +1,7 @@
-from typing import Any
+from typing import Any, Callable
 
 from bson import json_util
+from pymongo.collection import Collection
 
 from mongoie.dtypes import FilePath
 from mongoie.log import get_logger
@@ -9,11 +10,12 @@ from mongoie.utils import (
     write_closing_bracket,
     ChunkedDataStream,
 )
+from mongoie.settings import Settings
 
 logger = get_logger(__name__)
 
 
-def to_json(stream: ChunkedDataStream, file_path: FilePath) -> None:
+def to_json(stream: ChunkedDataStream, file_path: FilePath, **kwargs) -> None:
     """Writes ChunkedDataStream data to a JSON file.
 
     ChunkedDataStream contains chunks of data which are yielded in lazy way.
@@ -67,3 +69,29 @@ def to_csv(
         rows += len(df)
 
     logger.debug(f"{rows} rows written to {file_path}")
+
+
+def to_mongo(stream: ChunkedDataStream, collection: Collection, **kwargs):
+    logger.debug(f"writing json data to {collection.name}")
+    rows = 0
+    for chunk_idx, chunk in enumerate(stream):
+        rows += len(chunk)
+        logger.debug(f"writing idx: {chunk_idx} with {len(chunk)} documents")
+        collection.insert_many(chunk)
+    logger.debug(f"{rows} rows written to {collection.name}")
+
+
+writers = {
+    "csv": to_csv,
+    #'mongo': to_mongo,
+    "json": to_json,
+}
+
+
+def get_writer(file_suffix: str) -> Callable:
+    try:
+        writer = writers[file_suffix]
+    except KeyError:
+        logger.warning("couldn't find proper writer falling to default: json")
+        writer = writers[Settings.DEFAULT_WRITER_FORMAT]
+    return writer

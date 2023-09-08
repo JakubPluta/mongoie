@@ -11,6 +11,8 @@ python = "^3.9"
 pymongo = "^4.5.0"
 click = "^8.1.7"
 pandas = "^2.1.0"
+fastparquet = "^2023.8.0"
+ijson = "^3.2.3"
 
 
 [tool.poetry.group.dev.dependencies]
