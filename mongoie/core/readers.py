@@ -4,6 +4,7 @@ import ijson
 import pandas as pd
 from dtypes import FilePath
 from log import get_logger
+from pyarrow.parquet import ParquetFile
 from mongoie.utils import (
     chunk_generator,
     df_denormalize,
@@ -92,3 +93,47 @@ def read_csv(
             else chunk.to_dict("records")
         )
         yield chunk
+
+
+def _read_parquet(file_path: FilePath, batch_size: int = 1000):
+    """Reads a parquet file in chunks.
+
+    Args:
+        file_path: The path to the parquet file.
+        batch_size: The size of each chunk.
+
+    Yields:
+        A chunk of data from the parquet file.
+
+    """
+
+    parquet_file = ParquetFile(file_path)
+    for batch in parquet_file.iter_batches(batch_size=batch_size):
+        yield batch
+
+
+def read_parquet(
+    file_path: FilePath,
+    batch_size: int = 1000,
+    denormalized: bool = True,
+    record_prefix: str = ".",
+) -> List[Dict[Any, Any]]:
+    """Reads a parquet file in chunks and denormalizes the data.
+
+    Args:
+        file_path: The path to the parquet file.
+        batch_size: The size of each chunk.
+        denormalized: Whether to denormalize the data.
+        record_prefix: The prefix to use for denormalized records.
+
+    Yields:
+        A chunk of denormalized data from the parquet file.
+
+    """
+
+    for chunk in _read_parquet(file_path, batch_size):
+        df = chunk.to_pandas()
+        df = (
+            df_denormalize(df, record_prefix) if denormalized else df.to_dict("records")
+        )
+        yield df

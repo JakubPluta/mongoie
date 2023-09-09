@@ -109,11 +109,40 @@ def to_mongo(stream: ChunkedDataStream, collection: Collection, **kwargs):
     logger.debug(f"{rows} rows written to {collection.name}")
 
 
-writers = {
-    "csv": to_csv,
-    #'mongo': to_mongo,
-    "json": to_json,
-}
+def to_parquet(
+    stream: ChunkedDataStream,
+    file_path: FilePath,
+    **kwargs: Any,
+) -> None:
+    """Writes a ChunkedDataStream to a Parquet file.
+
+    ChunkedDataStream contains chunks of data which are yielded in lazy way.
+    Chunk structure: List[Dict[Any, Any]]
+
+    Writes whole stream
+
+    Args:
+        stream: The ChunkedDataStream object.
+        file_path: The path to the output Parquet file.
+        **kwargs: Keyword arguments for the `pandas.DataFrame.to_parquet()` function.
+
+    Returns:
+        None
+
+    """
+    logger.debug(f"writing mongo data to {file_path}")
+    rows = 0
+    for chunk_idx, chunk in enumerate(stream.iter_as_normalized_dfs()):
+        rows += len(chunk)
+        logger.debug(f"writing idx: {chunk_idx} with {len(chunk)} documents")
+        append = False if chunk_idx == 0 else True
+        chunk.astype(dtype="str").to_parquet(
+            file_path,
+            engine="fastparquet",
+            append=append,
+            **kwargs,
+        )
+    logger.debug(f"{rows} rows written to {file_path}")
 
 
 def get_writer(file_suffix: str) -> Callable:
@@ -136,3 +165,11 @@ def get_writer(file_suffix: str) -> Callable:
         )
         writer = writers[Settings.DEFAULT_WRITER_FORMAT]
     return writer
+
+
+writers = {
+    "csv": to_csv,
+    #'mongo': to_mongo,
+    "json": to_json,
+    "parquet": to_parquet,
+}
