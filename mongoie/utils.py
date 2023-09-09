@@ -12,7 +12,8 @@ from typing import (
     AnyStr,
     Generator,
 )
-
+import os
+from pathlib import Path
 import pandas as pd
 
 from mongoie.dtypes import FilePath, MongoDocument
@@ -49,7 +50,13 @@ def chunk_generator(iterable: Iterable, batch_size: int = 1000) -> Iterator[List
 
 @dataclasses.dataclass(repr=True)
 class ChunkedDataStream:
-    """A data stream that yields chunks of data."""
+    """A data stream that yields chunks of data.
+
+    Args:
+        data: An iterable object that yields data.
+        chunk_size: The size of each chunk.
+
+    """
 
     data: Iterable[Any]
     chunk_size: int = 1000
@@ -64,6 +71,7 @@ class ChunkedDataStream:
             yield chunk
 
     def iter_as_normalized_dfs(self):
+        """Iterate over the chunks of data as normalized Pandas DataFrames."""
         for chunk in self.data:
             yield json_normalize(chunk)
 
@@ -132,12 +140,6 @@ def df_denormalize(df: pd.DataFrame, record_prefix: str = ".") -> List[Dict[Any,
             current_record[keys[-1]] = column_value  # last key
         result.append(denormalized_records)
     return result
-
-
-import os
-from pathlib import Path
-from typing import Callable
-from dtypes import FilePath
 
 
 def validate_file_path(file_path: FilePath) -> FilePath:
@@ -297,14 +299,58 @@ def get_file_suffix(path: FilePath, dot: bool = True) -> str:
 
 
 def resolve_file_path(file_path: str) -> os.PathLike:
+    """
+    Resolve a file path to an absolute path.
+
+    Parameters
+    ----------
+    file_path : str
+        The file path to resolve.
+
+    Returns
+    -------
+    os.PathLike
+        The absolute file path.
+    """
+
     return Path(file_path).resolve()
 
 
-def build_file_name(file_format: str, *args) -> str:
-    name = "_".join([v for v in args])
+def build_file_name(file_format: str, sep="_", *args) -> str:
+    """
+    Build a file name from a file format and a list of arguments.
+
+    Parameters
+    ----------
+    file_format : str
+        The file format.
+    sep : str, optional
+        The separator to use between the arguments. Defaults to "_".
+    *args : str
+        The arguments to use in the file name.
+
+    Returns
+    -------
+    str
+        The built file name.
+    """
+
+    name = f"{sep}".join([v for v in args])
     file_format = file_format[1:] if file_format.startswith(".") else file_format
     return f"{name}.{file_format}"
 
 
-def build_file_path(file_name):
+def build_file_path(file_name) -> Path:
+    """Build a file path from a file name.
+
+    Parameters
+    ----------
+    file_name : str
+        The file name.
+
+    Returns
+    -------
+    Path
+        The file path.
+    """
     return Path(__file__).parent / file_name

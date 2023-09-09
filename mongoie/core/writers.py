@@ -16,16 +16,21 @@ logger = get_logger(__name__)
 
 
 def to_json(stream: ChunkedDataStream, file_path: FilePath, **kwargs) -> None:
-    """Writes ChunkedDataStream data to a JSON file.
+    """
+    Writes a ChunkedDataStream to a JSON file.
 
     ChunkedDataStream contains chunks of data which are yielded in lazy way.
-    Chunk structure: List[Dict[Any, Any]
+    Chunk structure: List[Dict[Any, Any]]
 
     Writes whole stream
 
     Args:
         stream: The ChunkedDataStream object.
         file_path: The path to the output JSON file.
+
+    Returns:
+        None
+
     """
 
     logger.debug(f"writing mongo data to {file_path}")
@@ -49,13 +54,21 @@ def to_csv(
     sep: str = ",",
     **kwargs: Any,
 ):
-    """Writes ChunkedDataStream data to a CSV file.
+    """Writes a ChunkedDataStream to a CSV file.
+
+    ChunkedDataStream contains chunks of data which are yielded in lazy way.
+    Chunk structure: List[Dict[Any, Any]]
+
+    Writes whole stream
 
     Args:
-        stream: The ChunkedDataStream object - stream of chunked pandas dataframe.
+        stream: The ChunkedDataStream object.
         file_path: The path to the output CSV file.
         sep: The delimiter used to separate the columns in the CSV file.
         **kwargs: Keyword arguments for the `pandas.DataFrame.to_csv()` function.
+
+    Returns:
+        None
 
     """
 
@@ -72,12 +85,27 @@ def to_csv(
 
 
 def to_mongo(stream: ChunkedDataStream, collection: Collection, **kwargs):
+    """Writes a ChunkedDataStream to a MongoDB collection.
+
+    ChunkedDataStream contains chunks of data which are yielded in lazy way.
+    Chunk structure: List[Dict[Any, Any]]
+
+    Writes whole stream
+
+    Args:
+        stream: The ChunkedDataStream object.
+        collection: The MongoDB collection object.
+        **kwargs: Keyword arguments for the `pymongo.collection.insert_many()` function.
+
+    Returns:
+        None
+    """
     logger.debug(f"writing json data to {collection.name}")
     rows = 0
     for chunk_idx, chunk in enumerate(stream):
         rows += len(chunk)
         logger.debug(f"writing idx: {chunk_idx} with {len(chunk)} documents")
-        collection.insert_many(chunk)
+        collection.insert_many(chunk, **kwargs)
     logger.debug(f"{rows} rows written to {collection.name}")
 
 
@@ -89,9 +117,22 @@ writers = {
 
 
 def get_writer(file_suffix: str) -> Callable:
+    """Gets a writer function for a given file suffix.
+
+    Args:
+        file_suffix: The file suffix.
+
+    Returns:
+        Callable: The writer function.
+    """
+
     try:
         writer = writers[file_suffix]
     except KeyError:
-        logger.warning("couldn't find proper writer falling to default: json")
+        logger.warning(
+            "couldn't find proper writer falling to default: {}".format(
+                Settings.DEFAULT_WRITER_FORMAT
+            )
+        )
         writer = writers[Settings.DEFAULT_WRITER_FORMAT]
     return writer
