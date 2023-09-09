@@ -1,14 +1,15 @@
-from typing import Iterable, Iterator, List, Any, Dict
+import json
+from typing import Iterable, Iterator, List, Any, Dict, Union
 
 import ijson
 import pandas as pd
 from dtypes import FilePath
 from log import get_logger
 from pyarrow.parquet import ParquetFile
-from mongoie.utils import (
-    chunk_generator,
-    df_denormalize,
-)
+from mongoie.utils import chunk_generator, df_denormalize, get_file_suffix
+from mongoie.decorators import valid_file_path
+from mongoie.exceptions import InvalidFileExtension
+
 
 logger = get_logger(__name__)
 
@@ -137,3 +138,33 @@ def read_parquet(
             df_denormalize(df, record_prefix) if denormalized else df.to_dict("records")
         )
         yield df
+
+
+@valid_file_path
+def read_mongo_query_or_pipeline_from_json_file(
+    file_path: FilePath,
+) -> Union[dict, List[Dict]]:
+    """Reads a MongoDB query or pipeline from a JSON file.
+
+    Args:
+        file_path: The path to the JSON file.
+
+    Returns:
+        The MongoDB query or pipeline as a dictionary or a list of dictionaries.
+
+    Raises:
+        InvalidFileExtension: If the file extension is not `.json`.
+
+    """
+    if get_file_suffix(file_path, dot=False) != "json":
+        raise InvalidFileExtension("provided file is not json file")
+
+    with open(file_path) as f:
+        data = json.load(f)
+
+    if data is None:
+        logger.warning(
+            "In current file, there is no valid query or pipeline specified. Setting up to default: {}"
+        )
+        return {}
+    return data
