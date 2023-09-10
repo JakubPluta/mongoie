@@ -27,7 +27,7 @@ from mongoie.core.api import export_from_mongo
     "-f", "-fp", "--file_path", help="output file path", required=True, type=str
 )
 @click.pass_context
-def from_mongo_writer(host, db, collection, query, file_path):
+def mongo_export(host, db, collection, query, file_path):
     export_from_mongo(
         host,
         db=db,
@@ -35,3 +35,23 @@ def from_mongo_writer(host, db, collection, query, file_path):
         query=query,
         file_path=file_path,
     )
+
+
+@click.command(
+    context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    )
+)
+@click.option("-u", "--uri", "--host", help="MongoDB host", required=True, type=str)
+@click.option(
+    "-d", "--db", "--database", help="Target MongoDB database", required=True, type=str
+)
+@click.option(
+    "-c", "--collection", help="Target MongoDB collection", required=True, type=str
+)
+@click.option(
+    "-f", "-fp", "--file_path", help="Input file path", required=True, type=str
+)
+def mongo_import(uri, db, collection, fp):
+    "import to mongo"

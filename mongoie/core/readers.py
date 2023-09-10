@@ -1,5 +1,5 @@
 import json
-from typing import Iterable, Iterator, List, Any, Dict, Union
+from typing import Iterable, Iterator, List, Any, Dict, Union, Callable
 
 import ijson
 import pandas as pd
@@ -9,7 +9,7 @@ from pyarrow.parquet import ParquetFile
 from mongoie.utils import chunk_generator, df_denormalize, get_file_suffix
 from mongoie.decorators import valid_file_path
 from mongoie.exceptions import InvalidFileExtension
-
+from settings import Settings
 
 logger = get_logger(__name__)
 
@@ -115,7 +115,7 @@ def _read_parquet(file_path: FilePath, batch_size: int = 1000):
 
 def read_parquet(
     file_path: FilePath,
-    batch_size: int = 1000,
+    chunk_size: int = 1000,
     denormalized: bool = True,
     record_prefix: str = ".",
 ) -> List[Dict[Any, Any]]:
@@ -123,7 +123,7 @@ def read_parquet(
 
     Args:
         file_path: The path to the parquet file.
-        batch_size: The size of each chunk.
+        chunk_size: The size of each chunk.
         denormalized: Whether to denormalize the data.
         record_prefix: The prefix to use for denormalized records.
 
@@ -132,7 +132,7 @@ def read_parquet(
 
     """
 
-    for chunk in _read_parquet(file_path, batch_size):
+    for chunk in _read_parquet(file_path, chunk_size):
         df = chunk.to_pandas()
         df = (
             df_denormalize(df, record_prefix) if denormalized else df.to_dict("records")
@@ -168,3 +168,32 @@ def read_mongo_query_or_pipeline_from_json_file(
         )
         return {}
     return data
+
+
+importers = {
+    "csv": read_csv,
+    "json": read_json,
+    "parquet": read_parquet,
+}
+
+
+def get_importer(file_suffix: str) -> Callable:
+    """Gets a reader function for a given file suffix.
+
+    Args:
+        file_suffix: The file suffix.
+
+    Returns:
+        Callable: The writer function.
+    """
+
+    try:
+        importer = importers[file_suffix]
+    except KeyError:
+        logger.warning(
+            "couldn't find proper importer fallback to default: {}".format(
+                Settings.DEFAULT_IMPORT_FORMAT
+            )
+        )
+        importer = importers[Settings.DEFAULT_IMPORT_FORMAT]
+    return importer

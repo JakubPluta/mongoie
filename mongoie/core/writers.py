@@ -78,7 +78,14 @@ def to_csv(
     for chunk_idx, df in enumerate(stream.iter_as_normalized_dfs()):
         logger.debug(f"writing idx: {chunk_idx} with {len(df)} documents")
         header = True if chunk_idx == 0 else False
-        df.to_csv(path_or_buf=file_path, sep=sep, mode="a", header=header, index=False, **kwargs)
+        df.to_csv(
+            path_or_buf=file_path,
+            sep=sep,
+            mode="a",
+            header=header,
+            index=False,
+            **kwargs,
+        )
         rows += len(df)
 
     logger.debug(f"{rows} rows written to {file_path}")
@@ -145,7 +152,7 @@ def to_parquet(
     logger.debug(f"{rows} rows written to {file_path}")
 
 
-def get_writer(file_suffix: str) -> Callable:
+def get_exporter(file_suffix: str) -> Callable:
     """Gets a writer function for a given file suffix.
 
     Args:
@@ -156,20 +163,19 @@ def get_writer(file_suffix: str) -> Callable:
     """
 
     try:
-        writer = writers[file_suffix]
+        writer = exporters[file_suffix]
     except KeyError:
         logger.warning(
             "couldn't find proper writer falling to default: {}".format(
-                Settings.DEFAULT_WRITER_FORMAT
+                Settings.DEFAULT_EXPORT_FORMAT
             )
         )
-        writer = writers[Settings.DEFAULT_WRITER_FORMAT]
+        writer = exporters[Settings.DEFAULT_EXPORT_FORMAT]
     return writer
 
 
-writers = {
+exporters = {
     "csv": to_csv,
     "json": to_json,
     "parquet": to_parquet,
-    # "mongo" : to_mongo  / currently disabled
 }
