@@ -34,18 +34,18 @@ def to_json(stream: ChunkedDataStream, file_path: FilePath, **kwargs) -> None:
     """
 
     logger.debug(f"writing mongo data to {file_path}")
-    docs = 0
+    rows = 0
     with open(file_path, "w") as file:
         file.write("[")
         for chunk_idx, chunk in enumerate(stream):
             logger.debug(f"writing idx: {chunk_idx} with {len(chunk)} documents")
-            docs += len(chunk)
+            rows += len(chunk)
             file.write(json_util.dumps(chunk)[1:-1])
             file.write(",")
 
     remove_last_character(file_path)
     write_closing_bracket(file_path)
-    logger.debug(f"{docs} documents written to {file_path}")
+    logger.debug(f"{rows} documents written to {file_path}")
 
 
 def to_csv(
@@ -78,7 +78,7 @@ def to_csv(
     for chunk_idx, df in enumerate(stream.iter_as_normalized_dfs()):
         logger.debug(f"writing idx: {chunk_idx} with {len(df)} documents")
         header = True if chunk_idx == 0 else False
-        df.to_csv(file_path, sep=sep, mode="a", header=header, index=False, **kwargs)
+        df.to_csv(path_or_buf=file_path, sep=sep, mode="a", header=header, index=False, **kwargs)
         rows += len(df)
 
     logger.debug(f"{rows} rows written to {file_path}")
@@ -169,7 +169,7 @@ def get_writer(file_suffix: str) -> Callable:
 
 writers = {
     "csv": to_csv,
-    #'mongo': to_mongo,
     "json": to_json,
     "parquet": to_parquet,
+    # "mongo" : to_mongo  / currently disabled
 }

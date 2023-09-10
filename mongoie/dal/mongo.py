@@ -120,6 +120,17 @@ class MongoConnector:
     def find(
         self, collection: str, query: Optional[MongoQuery] = None, **kwargs
     ) -> MongoCursor:
+        """Finds documents in a collection.
+
+        Args:
+            collection: The name of the collection.
+            query: The query to be used.
+            **kwargs: Keyword arguments for the `MongoDB` `find()` method.
+
+        Returns:
+            A `MongoDB` cursor.
+
+        """
         return self.db[collection].find(query or {}, {"_id": 0}, **kwargs)
 
     def aggregate(
@@ -128,4 +139,15 @@ class MongoConnector:
         pipeline: Optional[MongoPipeline] = None,
         **kwargs,
     ) -> MongoCursor:
+        """Aggregates documents in a collection.
+
+        Args:
+            collection: The name of the collection.
+            pipeline: The aggregation pipeline.
+            **kwargs: Keyword arguments for the `MongoDB` `aggregate()` method.
+
+        Returns:
+            A `MongoDB` cursor.
+
+        """
         return self.db[collection].aggregate(pipeline or [], **kwargs)

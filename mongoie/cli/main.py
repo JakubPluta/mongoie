@@ -27,7 +27,7 @@ from mongoie.core.api import export_from_mongo
     "-f", "-fp", "--file_path", help="output file path", required=True, type=str
 )
 @click.pass_context
-def from_mongo_writer(ctx, host, db, collection, query, file_path):
+def from_mongo_writer(host, db, collection, query, file_path):
     export_from_mongo(
         host,
         db=db,
