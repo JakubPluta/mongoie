@@ -14,7 +14,9 @@ from settings import Settings
 logger = get_logger(__name__)
 
 
-def read_json(file_path: FilePath, chunk_size: int = 1000) -> Iterator[List[Any]]:
+def read_json(
+    file_path: FilePath, chunk_size: int = 1000, **kwargs
+) -> Iterator[List[Any]]:
     """
     Read a JSON file in chunks in a lazy way.
 
@@ -66,6 +68,7 @@ def read_csv(
     chunk_size: int = 1000,
     denormalized: bool = True,
     record_prefix: str = ".",
+    **kwargs
 ) -> List[Dict[Any, Any]]:
     """
     Read a CSV file in chunks in a lazy way and denormalize the data.
@@ -118,6 +121,7 @@ def read_parquet(
     chunk_size: int = 1000,
     denormalized: bool = True,
     record_prefix: str = ".",
+    **kwargs
 ) -> List[Dict[Any, Any]]:
     """Reads a parquet file in chunks and denormalizes the data.
 
