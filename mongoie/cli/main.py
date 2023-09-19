@@ -2,7 +2,12 @@ from typing import Union
 
 import click
 
-from mongoie.core.api import export_from_mongo, import_to_mongo
+from mongoie.core.api import (
+    export_from_mongo,
+    import_to_mongo,
+    list_mongo_collections,
+    list_mongo_databases,
+)
 
 
 @click.command(
@@ -83,3 +88,22 @@ def mongo_import(uri, db, collection, fp, denormalized, record_prefix, clear_bef
         clear_before=clear_before,
         file_path=fp,
     )
+
+
+# utilit
+@click.option("-u", "--uri", "--host", help="MongoDB host", required=True, type=str)
+@click.option(
+    "-d", "--db", "--database", help="MongoDB database", required=True, type=str
+)
+@click.option(
+    "-r",
+    "--re",
+    "--regex",
+    help="regex to filter collection names",
+    required=False,
+    type=str,
+)
+def list_collections(host, db, regex):
+    collections = list_mongo_collections(host, db, regex)
+    for c in collections:
+        click.echo(c)

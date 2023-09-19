@@ -208,6 +208,51 @@ class MongoImporter:
         self._import(self._prep_chunks(**kwargs), self.file_path, **kwargs)
 
 
+def list_mongo_databases(host: str, db: str):
+    """List all MongoDB databases on the given host.
+
+    Parameters
+    ----------
+    host : str
+        The hostname or IP address of the MongoDB server.
+    db : str
+        The name of the database to connect to.
+
+    Returns
+    -------
+    list[str]
+        A list of database names.
+
+    """
+
+    client = MongoConnector(host, db=db)
+    return client.list_dbs()
+
+
+def list_mongo_collections(host: str, db, regex=None):
+    """List all MongoDB collections on the given host, matching the given criteria.
+
+    Parameters
+    ----------
+    host : str
+        The hostname or IP address of the MongoDB server.
+    db : str
+        The name of the database to list collections from.
+    regex : str, optional
+        A regular expression to match collection names against.
+        Defaults to None, in which case all collections will be returned.
+
+    Returns
+    -------
+    list[str]
+        A list of collection names.
+
+    """
+
+    client = MongoConnector(host, db=db)
+    return client.list_collections(database=db, regex=regex)
+
+
 def export_from_mongo(
     host: str,
     *,
@@ -319,4 +364,11 @@ def import_to_mongo(
     importer.execute(**kwargs)
 
 
-__all__ = ["MongoExporter", "MongoImporter", "import_to_mongo", "export_from_mongo"]
+__all__ = [
+    "MongoExporter",
+    "MongoImporter",
+    "import_to_mongo",
+    "export_from_mongo",
+    "list_mongo_collections",
+    "list_mongo_databases",
+]

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Sequence, Union
+from typing import Any, Dict, Optional, Sequence, Union, List
 
 from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
 
 from mongoie.dtypes import (
     MongoCursor,
@@ -151,3 +152,20 @@ class MongoConnector:
 
         """
         return self.db[collection].aggregate(pipeline or [], **kwargs)
+
+    def list_collections(self, regex: Optional[str] = None) -> List[str]:
+        """Get a list of all the collection names in this database."""
+        filter = {"name": {"$regex": regex}} if regex else None
+        return self.db.list_collection_names(filter=filter)
+
+    def list_dbs(self) -> List[str]:
+        """Get a list of the names of all databases on the connected server."""
+        return self._client.list_database_names()
+
+    def check_connection(self) -> None:
+        """Check if can establish connection to mongodb"""
+        try:
+            self._client.admin.command("ismaster")
+            logger.info(f"{self._client.HOST} {self._client.PORT} connected ")
+        except ConnectionFailure:
+            logger.error("server is not available")
