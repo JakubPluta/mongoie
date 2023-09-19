@@ -103,7 +103,12 @@ def mongo_import(uri, db, collection, fp, denormalized, record_prefix, clear_bef
     required=False,
     type=str,
 )
-def list_collections(host, db, regex):
+@click.option(
+    "-l", "--limit", help="Limit of collections to show", required=False, type=int
+)
+def list_collections(host, db, regex, limit):
     collections = list_mongo_collections(host, db, regex)
+    if limit and limit > 0:
+        collections = collections[:limit]
     for c in collections:
         click.echo(c)
