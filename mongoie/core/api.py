@@ -1,8 +1,7 @@
 from typing import Callable, Union, Any, Optional
 
-
 from mongoie.core.readers import get_reader
-from mongoie.core.writers import get_exporter, to_mongo
+from mongoie.core.writers import get_exporter, to_mongo, write_chunks
 from mongoie.dal.mongo import MongoConnector
 from mongoie.dtypes import MongoQuery, MongoPipeline, FilePath
 from mongoie.utils import (
@@ -29,6 +28,7 @@ class MongoExporter:
         collection: str,
         query: Optional[Union[MongoQuery, MongoPipeline]] = None,
         file_path: Optional[FilePath] = None,
+        file_size: Optional[int] = None,
         normalize: bool = True,
     ):
         """Initialize MongoExporter
@@ -45,6 +45,8 @@ class MongoExporter:
             A MongoDB query or pipeline to filter the data.
         file_path: FilePath
             The path to the output file.
+        file_size: int
+            maximum records per file - if specified data will stored in multi files
         normalize: bool
             Either normalize data when writing to file or ignore normalization
         """
@@ -69,6 +71,13 @@ class MongoExporter:
         self.data_writer = get_exporter(self._file_suffix)
         self.normalize = normalize
 
+        if file_size and file_size <= 0:
+            logger.warning(
+                "file size is smaller or equal to 0 -> setting file_size to None"
+            )
+            file_size = None
+        self.file_size = file_size
+
     def _prep_chunks(self, **kwargs: Any) -> ChunkedDataStream:
         """Prepares chunks of data to be exported.
 
@@ -84,6 +93,8 @@ class MongoExporter:
         """
 
         cursor = self.query_mongo(self.collection, self.query, **kwargs)
+        if self.file_size:
+            return ChunkedDataStream(cursor, self.file_size)
         return ChunkedDataStream(cursor)
 
     def _export(self, data: ChunkedDataStream, file_path: FilePath, **kwargs: Any):
@@ -98,11 +109,18 @@ class MongoExporter:
         kwargs:
             Keyword arguments to pass to the data writer.
         """
-
         logger.info(
             f"writing data to {file_path}. using {self.data_writer.__name__} writer"
         )
-        self.data_writer(data, file_path, normalize=self.normalize, **kwargs)
+        write_chunks(
+            file_path=self.file_path,
+            data=data,
+            writer_func=self.data_writer,
+            chunk_size=Settings.CHUNK_SIZE,
+            multi_files=True if self.file_size else False,
+            normalize=self.normalize,
+            **kwargs,
+        )
 
     def execute(self, **kwargs):
         """Exports the data to the specified file path.
@@ -180,8 +198,10 @@ class MongoImporter:
         if kwargs and kwargs.get("skip_if_not_empty", False) is True:
             docs = collection.count_documents({})
             if docs > 0:
-                logger.debug("skipping inserting data to mongo: param skip_if_not_empty is True, "
-                             f"and collection {collection.name} is not empty (documents: {docs})")
+                logger.debug(
+                    "skipping inserting data to mongo: param skip_if_not_empty is True, "
+                    f"and collection {collection.name} is not empty (documents: {docs})"
+                )
                 return
         to_mongo(data, collection, **kwargs)
 
@@ -258,6 +278,7 @@ def export_from_mongo(
     query: Optional[Union[MongoPipeline, MongoQuery]] = None,
     file_path: FilePath,
     normalize: bool = True,
+    file_size: Optional[int] = None,
     **kwargs: Any,
 ):
     """Exports data from MongoDB to a file.
@@ -277,6 +298,8 @@ def export_from_mongo(
         A MongoDB pipeline or query to filter the data to be exported.
     file_path: FilePath
         The path to the file to export the data to.
+    file_size: maximum records per file:
+        The maximum number of records in single file
     normalize: True
         Flag to normalize data
     kwargs: Any
@@ -298,8 +321,13 @@ def export_from_mongo(
     ```
     """
     exporter = MongoExporter(
-        host=host, db=db, collection=collection, query=query, file_path=file_path,
-        normalize=normalize
+        host=host,
+        db=db,
+        collection=collection,
+        query=query,
+        file_path=file_path,
+        normalize=normalize,
+        file_size=file_size,
     )
     exporter.execute(**kwargs)
 

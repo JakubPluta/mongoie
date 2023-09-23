@@ -358,3 +358,23 @@ def build_file_path(file_name) -> Path:
         The file path.
     """
     return Path(__file__).parent / file_name
+
+
+def add_number_prefix_to_file_path(
+    file_path: FilePath, name_suffix: Union[AnyStr, int]
+) -> FilePath:
+    """Add a number prefix to the file path.
+
+    Parameters
+    ----------
+    file_path: The file path.
+    name_suffix: The name suffix.
+
+    Returns
+    -------
+    PathLike: The file path with the number prefix.
+
+    """
+
+    p = Path(file_path)
+    return Path(p.parent, f"{p.stem}_{name_suffix}{p.suffix}").resolve()

@@ -6,12 +6,38 @@ import pandas as pd
 from mongoie.dtypes import FilePath
 from mongoie.log import get_logger
 from pyarrow.parquet import ParquetFile
-from mongoie.utils import chunk_generator, df_denormalize, get_file_suffix
+from mongoie.utils import (
+    chunk_generator,
+    df_denormalize,
+    get_file_suffix,
+    ChunkedDataStream,
+)
 from mongoie.decorators import valid_file_path
 from mongoie.exceptions import InvalidFileExtension
 from mongoie.settings import Settings
 
 logger = get_logger(__name__)
+
+
+def _read_json(file_path: FilePath) -> Iterator[Dict]:
+    """
+    Read a JSON in a lazy way.
+
+    Parameters
+    ----------
+    file_path : FilePath
+        The path to the JSON file.
+
+    Returns
+    -------
+    Iterator[dict]
+        An iterator over the JSON records in the file, one chunk at a time.
+    """
+    with open(file_path, "rb") as f:
+        for record in ijson.items(f, "item"):
+            if "_id" in record:
+                del record["_id"]
+            yield record
 
 
 def read_json(
@@ -29,17 +55,10 @@ def read_json(
 
     Returns
     -------
-    Iterator[dict]
+     Iterator[List[Any]]
         An iterator over the JSON records in the file, one chunk at a time.
     """
-
-    def _read_json():
-        with open(file_path, "rb") as f:
-            for record in ijson.items(f, "item"):
-                if '_id' in record:
-                    del record['_id']
-                yield record
-    yield from chunk_generator(_read_json(), chunk_size)
+    yield from chunk_generator(_read_json(file_path), chunk_size)
 
 
 def _read_csv(file_path: FilePath, chunk_size: int = 1000) -> Iterable[pd.DataFrame]:

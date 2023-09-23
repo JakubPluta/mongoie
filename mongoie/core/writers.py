@@ -9,10 +9,17 @@ from mongoie.utils import (
     remove_last_character,
     write_closing_bracket,
     ChunkedDataStream,
+    add_number_prefix_to_file_path,
+    mkdir_if_not_exists,
 )
 from mongoie.settings import Settings
 
 logger = get_logger(__name__)
+
+
+# signature
+def _to(stream: ChunkedDataStream, file_path: FilePath, **kwargs):
+    pass
 
 
 def to_json(stream: ChunkedDataStream, file_path: FilePath, **kwargs) -> None:
@@ -76,7 +83,9 @@ def to_csv(
 
     logger.debug(f"writing mongo data to {file_path}")
     rows = 0
-    stream_iterator = stream.iter_as_df() if normalize is False else stream.iter_as_normalized_dfs()
+    stream_iterator = (
+        stream.iter_as_df() if normalize is False else stream.iter_as_normalized_dfs()
+    )
     for chunk_idx, df in enumerate(stream_iterator):
         logger.debug(f"writing idx: {chunk_idx} with {len(df)} documents")
         header = True if chunk_idx == 0 else False
@@ -143,7 +152,9 @@ def to_parquet(
     """
     logger.debug(f"writing mongo data to {file_path}")
     rows = 0
-    stream_iterator = stream.iter_as_df() if normalize is False else stream.iter_as_normalized_dfs()
+    stream_iterator = (
+        stream.iter_as_df() if normalize is False else stream.iter_as_normalized_dfs()
+    )
     for chunk_idx, chunk in enumerate(stream_iterator):
         rows += len(chunk)
         logger.debug(f"writing idx: {chunk_idx} with {len(chunk)} documents")
@@ -155,6 +166,48 @@ def to_parquet(
             **kwargs,
         )
     logger.debug(f"{rows} rows written to {file_path}")
+
+
+def write_chunks(
+    data: ChunkedDataStream,
+    writer_func: Callable,
+    file_path: FilePath,
+    chunk_size: int = 1000,
+    multi_files: bool = False,
+    **kwargs: Any,
+):
+    """Writes a ChunkedDataStream to a file or multiple files.
+
+    Parameters
+    ----------
+    data: ChunkedDataStream
+        The ChunkedDataStream to write.
+    writer_func: Callable
+        A function that writes a ChunkedDataStream to a file.
+    file_path: str
+        The path to the file to write to.
+    chunk_size: int, optional
+        The size of each chunk to write. The default value is 1000.
+    multi_files: bool, optional
+        Whether to write the data to multiple files. The default value is False.
+    kwargs: Any, optional
+        Additional keyword arguments to pass to the writer_func function.
+
+    Returns
+    -------
+    None
+
+    """
+
+    mkdir_if_not_exists(file_path)
+
+    if multi_files is True:
+        multi_file_chunks = (ChunkedDataStream(chunk, chunk_size) for chunk in data)
+        for idx, chunk in enumerate(multi_file_chunks):
+            new_file_path = add_number_prefix_to_file_path(file_path, f"chunk_{idx}")
+            writer_func(chunk, file_path=new_file_path, **kwargs)
+    else:
+        writer_func(data, file_path=file_path, **kwargs)
 
 
 def get_exporter(file_suffix: str) -> Callable:

@@ -9,3 +9,4 @@ class Settings:
     DENORMALIZE_IMPORTED_DATA: bool = True
     CLEAR_COLLECTION_BEFORE_IMPORT: bool = True
     DENORMALIZATION_RECORD_PREFIX: str = "."
+    CHUNK_SIZE: int = 1000
