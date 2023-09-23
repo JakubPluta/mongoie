@@ -52,6 +52,7 @@ def to_csv(
     stream: ChunkedDataStream,
     file_path: FilePath,
     sep: str = ",",
+    normalize: bool = True,
     **kwargs: Any,
 ):
     """Writes a ChunkedDataStream to a CSV file.
@@ -65,6 +66,7 @@ def to_csv(
         stream: The ChunkedDataStream object.
         file_path: The path to the output CSV file.
         sep: The delimiter used to separate the columns in the CSV file.
+        normalize: Store data as normalized
         **kwargs: Keyword arguments for the `pandas.DataFrame.to_csv()` function.
 
     Returns:
@@ -74,8 +76,8 @@ def to_csv(
 
     logger.debug(f"writing mongo data to {file_path}")
     rows = 0
-
-    for chunk_idx, df in enumerate(stream.iter_as_normalized_dfs()):
+    stream_iterator = stream.iter_as_df() if normalize is False else stream.iter_as_normalized_dfs()
+    for chunk_idx, df in enumerate(stream_iterator):
         logger.debug(f"writing idx: {chunk_idx} with {len(df)} documents")
         header = True if chunk_idx == 0 else False
         df.to_csv(
@@ -119,6 +121,7 @@ def to_mongo(stream: ChunkedDataStream, collection: Collection, **kwargs):
 def to_parquet(
     stream: ChunkedDataStream,
     file_path: FilePath,
+    normalize: bool = True,
     **kwargs: Any,
 ) -> None:
     """Writes a ChunkedDataStream to a Parquet file.
@@ -131,6 +134,7 @@ def to_parquet(
     Args:
         stream: The ChunkedDataStream object.
         file_path: The path to the output Parquet file.
+        normalize: Normalize data
         **kwargs: Keyword arguments for the `pandas.DataFrame.to_parquet()` function.
 
     Returns:
@@ -139,7 +143,8 @@ def to_parquet(
     """
     logger.debug(f"writing mongo data to {file_path}")
     rows = 0
-    for chunk_idx, chunk in enumerate(stream.iter_as_normalized_dfs()):
+    stream_iterator = stream.iter_as_df() if normalize is False else stream.iter_as_normalized_dfs()
+    for chunk_idx, chunk in enumerate(stream_iterator):
         rows += len(chunk)
         logger.debug(f"writing idx: {chunk_idx} with {len(chunk)} documents")
         append = False if chunk_idx == 0 else True

@@ -75,6 +75,10 @@ class ChunkedDataStream:
         for chunk in self.data:
             yield json_normalize(chunk)
 
+    def iter_as_df(self):
+        for chunk in self.data:
+            yield pd.DataFrame(chunk)
+
 
 def remove_last_character(file_path: FilePath) -> None:
     """Open file and remove the last character from it.
