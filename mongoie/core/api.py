@@ -29,6 +29,7 @@ class MongoExporter:
         collection: str,
         query: Optional[Union[MongoQuery, MongoPipeline]] = None,
         file_path: Optional[FilePath] = None,
+        normalize: bool = True,
     ):
         """Initialize MongoExporter
 
@@ -44,6 +45,8 @@ class MongoExporter:
             A MongoDB query or pipeline to filter the data.
         file_path: FilePath
             The path to the output file.
+        normalize: bool
+            Either normalize data when writing to file or ignore normalization
         """
 
         self.client = MongoConnector(host, db=db)
@@ -64,6 +67,7 @@ class MongoExporter:
             self.file_path = file_path
 
         self.data_writer = get_exporter(self._file_suffix)
+        self.normalize = normalize
 
     def _prep_chunks(self, **kwargs: Any) -> ChunkedDataStream:
         """Prepares chunks of data to be exported.
@@ -98,7 +102,7 @@ class MongoExporter:
         logger.info(
             f"writing data to {file_path}. using {self.data_writer.__name__} writer"
         )
-        self.data_writer(data, file_path, **kwargs)
+        self.data_writer(data, file_path, normalize=self.normalize, **kwargs)
 
     def execute(self, **kwargs):
         """Exports the data to the specified file path.
@@ -253,6 +257,7 @@ def export_from_mongo(
     collection: str,
     query: Optional[Union[MongoPipeline, MongoQuery]] = None,
     file_path: FilePath,
+    normalize: bool = True,
     **kwargs: Any,
 ):
     """Exports data from MongoDB to a file.
@@ -272,6 +277,8 @@ def export_from_mongo(
         A MongoDB pipeline or query to filter the data to be exported.
     file_path: FilePath
         The path to the file to export the data to.
+    normalize: True
+        Flag to normalize data
     kwargs: Any
         Keyword arguments to pass to the exporter.
 
@@ -291,7 +298,8 @@ def export_from_mongo(
     ```
     """
     exporter = MongoExporter(
-        host=host, db=db, collection=collection, query=query, file_path=file_path
+        host=host, db=db, collection=collection, query=query, file_path=file_path,
+        normalize=normalize
     )
     exporter.execute(**kwargs)
 
