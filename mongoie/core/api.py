@@ -1,9 +1,8 @@
-from typing import Callable, Union, Any
+from typing import Callable, Union, Any, Optional
 
-from typing_extensions import Optional
 
-from core.readers import get_importer
-from mongoie.core.writers import get_exporter
+from mongoie.core.readers import get_reader
+from mongoie.core.writers import get_exporter, to_mongo
 from mongoie.dal.mongo import MongoConnector
 from mongoie.dtypes import MongoQuery, MongoPipeline, FilePath
 from mongoie.utils import (
@@ -14,7 +13,7 @@ from mongoie.utils import (
     validate_file_path,
 )
 from mongoie.log import get_logger
-from settings import Settings
+from mongoie.settings import Settings
 
 logger = get_logger(__name__)
 
@@ -61,7 +60,7 @@ class MongoExporter:
             self._file_suffix = "json"
             self.file_path = build_file_path(build_file_name(db, collection))
         else:
-            self._file_suffix = get_file_suffix(file_path)
+            self._file_suffix = get_file_suffix(file_path, dot=False)
             self.file_path = file_path
 
         self.data_writer = get_exporter(self._file_suffix)
@@ -133,9 +132,9 @@ class MongoImporter:
         host: str
             The host address of the MongoDB server.
         db: str
-            The name of the database to export from.
+            The name of the database to import to.
         collection: str
-            The name of the collection to export from.
+            The name of the collection to import tp.
         file_path: FilePath
             The path to the output file.
         denormalized: bool
@@ -147,12 +146,13 @@ class MongoImporter:
             Flag to clear collection before import to mongo
         """
         self.client = MongoConnector(host, db=db)
-        self.collection = collection
 
-        self._file_suffix = get_file_suffix(file_path)
+        self.collection = self.client.get_collection(collection)
+
+        self._file_suffix = get_file_suffix(file_path, dot=False)
         self.file_path = validate_file_path(file_path)
 
-        self.data_importer = get_importer(self._file_suffix)
+        self.data_reader = get_reader(self._file_suffix)
 
         self._denormalized = denormalized or Settings.DENORMALIZE_IMPORTED_DATA
         self._record_prefix = (
@@ -160,43 +160,26 @@ class MongoImporter:
         )
         self._clear_before = clear_before or Settings.CLEAR_COLLECTION_BEFORE_IMPORT
 
-    def _prep_chunks(self, **kwargs: Any) -> ChunkedDataStream:
-        """Prepares chunks of data to be exported.
-
-        Parameters
-        ----------
-        kwargs :
-            Keyword arguments to pass to the `query_mongo()` method.
-
-        Returns
-        -------
-        ChunkedDataStream :
-            A `ChunkedDataStream` object containing the chunks of data to be exported.
-        """
-        data_gen = self.data_importer(
-            self.file_path,
-            denormalized=self._denormalized,
-            record_prefix=self._record_prefix,
-            **kwargs,
-        )
-        return ChunkedDataStream(data_gen)
-
-    def _import(self, data, file_path: FilePath, **kwargs: Any):
+    @staticmethod
+    def _import(data, collection, **kwargs: Any):
         """Imports data to mongo from file.
 
         Parameters
         ----------
         data:
             The data to import.
-        file_path:
-            The path to the file to import the data from.
+        collection:
+             MongoDB Collection Object
         kwargs:
             Keyword arguments to pass to the data importer.
         """
-        logger.info(
-            f"importing data to mongo from file: {file_path}. using {self.data_importer.__name__} importer"
-        )
-        self.data_importer(data, file_path, **kwargs)
+        if kwargs and kwargs.get("skip_if_not_empty", False) is True:
+            docs = collection.count_documents({})
+            if docs > 0:
+                logger.debug("skipping inserting data to mongo: param skip_if_not_empty is True, "
+                             f"and collection {collection.name} is not empty (documents: {docs})")
+                return
+        to_mongo(data, collection, **kwargs)
 
     def execute(self, **kwargs: Any):
         """Imports the data to mongo from the specified file path.
@@ -205,7 +188,17 @@ class MongoImporter:
         kwargs:
             Keyword arguments to pass to the `_import()` method.
         """
-        self._import(self._prep_chunks(**kwargs), self.file_path, **kwargs)
+        logger.info(
+            f"importing data to mongo from file: {self.file_path}. using {self.data_reader.__name__} to read data and"
+            f"to_mongo to write data to Mongo(db={self.client.db.name}, coll={self.collection.name}"
+        )
+        data_gen = self.data_reader(
+            self.file_path,
+            denormalized=self._denormalized,
+            record_prefix=self._record_prefix,
+            **kwargs,
+        )
+        self._import(data_gen, self.collection, **kwargs)
 
 
 def list_mongo_databases(host: str, db: str):
@@ -250,7 +243,7 @@ def list_mongo_collections(host: str, db, regex=None):
     """
 
     client = MongoConnector(host, db=db)
-    return client.list_collections(database=db, regex=regex)
+    return client.list_collections(regex=regex)
 
 
 def export_from_mongo(
@@ -290,7 +283,7 @@ def export_from_mongo(
 
     # Export the "users" collection from the "my_database" database to a file
     export_from_mongo(
-        host="localhost":27017,
+        host="localhost:27017,
         db="my_database",
         collection="users",
         file_path="/path/to/export.csv",

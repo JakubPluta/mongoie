@@ -3,13 +3,13 @@ from typing import Iterable, Iterator, List, Any, Dict, Union, Callable
 
 import ijson
 import pandas as pd
-from dtypes import FilePath
-from log import get_logger
+from mongoie.dtypes import FilePath
+from mongoie.log import get_logger
 from pyarrow.parquet import ParquetFile
 from mongoie.utils import chunk_generator, df_denormalize, get_file_suffix
 from mongoie.decorators import valid_file_path
 from mongoie.exceptions import InvalidFileExtension
-from settings import Settings
+from mongoie.settings import Settings
 
 logger = get_logger(__name__)
 
@@ -36,9 +36,9 @@ def read_json(
     def _read_json():
         with open(file_path, "rb") as f:
             for record in ijson.items(f, "item"):
-                del record["_id"]
+                if '_id' in record:
+                    del record['_id']
                 yield record
-
     yield from chunk_generator(_read_json(), chunk_size)
 
 
@@ -174,14 +174,14 @@ def read_mongo_query_or_pipeline_from_json_file(
     return data
 
 
-importers = {
+readers = {
     "csv": read_csv,
     "json": read_json,
     "parquet": read_parquet,
 }
 
 
-def get_importer(file_suffix: str) -> Callable:
+def get_reader(file_suffix: str) -> Callable:
     """Gets a reader function for a given file suffix.
 
     Args:
@@ -192,12 +192,12 @@ def get_importer(file_suffix: str) -> Callable:
     """
 
     try:
-        importer = importers[file_suffix]
+        reader = readers[file_suffix]
     except KeyError:
         logger.warning(
             "couldn't find proper importer fallback to default: {}".format(
                 Settings.DEFAULT_IMPORT_FORMAT
             )
         )
-        importer = importers[Settings.DEFAULT_IMPORT_FORMAT]
-    return importer
+        reader = readers[Settings.DEFAULT_IMPORT_FORMAT]
+    return reader

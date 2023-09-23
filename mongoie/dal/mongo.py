@@ -82,12 +82,12 @@ class MongoConnector:
         :return: A Mongo database"""
         return self._client.get_database(database)
 
-    def get_collection(self, collection: str) -> MongoCollection:
+    def get_collection(self, collection: str, **kwargs) -> MongoCollection:
         """Get MongoDB collection."""
-        return self.db.get_collection(collection)
+        return self.db.get_collection(collection, **kwargs)
 
     def get_collection_count(
-        self, collection: str, filter: Optional[MongoQuery] = None, **kwargs
+        self, collection: str, filter_: Optional[MongoQuery] = None, **kwargs
     ) -> int:
         """Count number of documents in collection. If filter provided then collection will be filtered before count,
         default filter is None.
@@ -95,13 +95,13 @@ class MongoConnector:
         Parameters
         ----------
         collection : name of collection
-        filter : filter eq: {"user_id" : {"$eq" : "abcd123"}}
+        filter_ : filter eq: {"user_id" : {"$eq" : "abcd123"}}
 
         Returns
         -------
         int: documents count in given collection"""
         return self.db.get_collection(collection).count_documents(
-            filter or {}, **kwargs
+            filter_ or {}, **kwargs
         )
 
     def connect(self):
@@ -155,8 +155,8 @@ class MongoConnector:
 
     def list_collections(self, regex: Optional[str] = None) -> List[str]:
         """Get a list of all the collection names in this database."""
-        filter = {"name": {"$regex": regex}} if regex else None
-        return self.db.list_collection_names(filter=filter)
+        filter_ = {"name": {"$regex": regex}} if regex else None
+        return self.db.list_collection_names(filter=filter_)
 
     def list_dbs(self) -> List[str]:
         """Get a list of the names of all databases on the connected server."""
