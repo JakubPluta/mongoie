@@ -3,12 +3,12 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Sequence, Union, List
 
 from pymongo import MongoClient
+from pymongo.collection import Collection
 from pymongo.errors import ConnectionFailure
 
 from mongoie.dtypes import (
     MongoCursor,
     MongoDatabase,
-    MongoCollection,
     MongoQuery,
     MongoPipeline,
 )
@@ -82,7 +82,7 @@ class MongoConnector:
         :return: A Mongo database"""
         return self._client.get_database(database)
 
-    def get_collection(self, collection: str, **kwargs) -> MongoCollection:
+    def get_collection(self, collection: str, **kwargs) -> Collection:
         """Get MongoDB collection."""
         return self.db.get_collection(collection, **kwargs)
 

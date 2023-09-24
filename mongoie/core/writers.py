@@ -198,6 +198,8 @@ def write_chunks(
     None
 
     """
+    if not isinstance(data, ChunkedDataStream):
+        data = ChunkedDataStream(data)
 
     mkdir_if_not_exists(file_path)
 

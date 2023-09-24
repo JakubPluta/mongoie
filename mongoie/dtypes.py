@@ -4,6 +4,7 @@ from typing import Any, Dict, Union, List
 from pymongo.cursor import Cursor
 from pymongo.database import CommandCursor, Database, Collection
 
+
 FilePath = Union[str, os.PathLike]
 MongoDocument = Dict[Any, Any]
 MongoAggregationCursor = CommandCursor[MongoDocument]

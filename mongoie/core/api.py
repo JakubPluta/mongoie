@@ -1,9 +1,12 @@
-from typing import Callable, Union, Any, Optional
+from typing import Callable, Union, Any, Optional, Iterable
+
+from pymongo.collection import Collection
+from pymongo.cursor import Cursor
 
 from mongoie.core.readers import get_reader
 from mongoie.core.writers import get_exporter, to_mongo, write_chunks
 from mongoie.dal.mongo import MongoConnector
-from mongoie.dtypes import MongoQuery, MongoPipeline, FilePath
+from mongoie.dtypes import MongoQuery, MongoPipeline, FilePath, MongoCursor
 from mongoie.utils import (
     ChunkedDataStream,
     get_file_suffix,
@@ -17,85 +20,66 @@ from mongoie.settings import Settings
 logger = get_logger(__name__)
 
 
-class MongoExporter:
-    """Exports data from MongoDB to a file."""
+class Exporter:
+    """Exports data to a file.
+
+    Examples
+    --------
+    >>> exporter = Exporter(file_path="my_file.csv")
+    >>> exporter.execute(data=[1, 2, 3])
+
+    This will export the data `[1, 2, 3]` to the file `my_file.csv`.
+    """
 
     def __init__(
         self,
-        host: str,
-        *,
-        db: str,
-        collection: str,
-        query: Optional[Union[MongoQuery, MongoPipeline]] = None,
-        file_path: Optional[FilePath] = None,
+        file_path: FilePath,
         file_size: Optional[int] = None,
-        normalize: bool = True,
+        normalize: Optional[bool] = None,
+        **kwargs: Any,
     ):
-        """Initialize MongoExporter
+        """Initialize Exporter
 
         Parameters
         ----------
-        host: str
-            The host address of the MongoDB server.
-        db: str
-            The name of the database to export from.
-        collection: str
-            The name of the collection to export from.
-        query: dict | list
-            A MongoDB query or pipeline to filter the data.
         file_path: FilePath
-            The path to the output file.
-        file_size: int
-            maximum records per file - if specified data will stored in multi files
-        normalize: bool
-            Either normalize data when writing to file or ignore normalization
+            The path to the file to export the data to.
+        file_size: Optional[int] = None
+            The maximum size of each file to export to. If `None`, the data will be exported to a single file.
+        normalize: bool = True
+            Whether to normalize the data before exporting it.
+        **kwargs: Any
+            Keyword arguments to pass to the data writer.
         """
 
-        self.client = MongoConnector(host, db=db)
-        self.collection = collection
-        self.query = {} if query is None else query
-        self.query_mongo: Callable = (
-            self.client.aggregate if isinstance(query, list) else self.client.find
-        )
+        self._file_suffix = get_file_suffix(file_path, dot=False)
+        self._file_path = file_path
 
-        if file_path is None:
-            logger.warning(
-                "output file path not provided. Setting default format to json"
-            )
-            self._file_suffix = "json"
-            self.file_path = build_file_path(build_file_name(db, collection))
-        else:
-            self._file_suffix = get_file_suffix(file_path, dot=False)
-            self.file_path = file_path
-
-        self.data_writer = get_exporter(self._file_suffix)
-        self.normalize = normalize
+        self._data_writer = get_exporter(self._file_suffix)
+        self._normalize = normalize or Settings.NORMALIZE_EXPORTED_DATA
 
         if file_size and file_size <= 0:
             logger.warning(
                 "file size is smaller or equal to 0 -> setting file_size to None"
             )
             file_size = None
-        self.file_size = file_size
+        self._file_size = file_size
 
-    def _prep_chunks(self, **kwargs: Any) -> ChunkedDataStream:
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+    def _prep_chunks(self, data: Iterable, **kwargs) -> ChunkedDataStream:
         """Prepares chunks of data to be exported.
-
-        Parameters
-        ----------
-        kwargs :
-            Keyword arguments to pass to the `query_mongo()` method.
-
         Returns
         -------
         ChunkedDataStream :
             A `ChunkedDataStream` object containing the chunks of data to be exported.
         """
-
-        cursor = self.query_mongo(self.collection, self.query, **kwargs)
-        if self.file_size:
-            return ChunkedDataStream(cursor, self.file_size)
-        return ChunkedDataStream(cursor)
+        return (
+            ChunkedDataStream(data, self._file_size)
+            if self._file_size
+            else ChunkedDataStream(data)
+        )
 
     def _export(self, data: ChunkedDataStream, file_path: FilePath, **kwargs: Any):
         """Exports data to the specified file path.
@@ -110,15 +94,15 @@ class MongoExporter:
             Keyword arguments to pass to the data writer.
         """
         logger.info(
-            f"writing data to {file_path}. using {self.data_writer.__name__} writer"
+            f"writing data to {file_path}. using {self._data_writer.__name__} writer"
         )
         write_chunks(
-            file_path=self.file_path,
+            file_path=self._file_path,
             data=data,
-            writer_func=self.data_writer,
+            writer_func=self._data_writer,
             chunk_size=Settings.CHUNK_SIZE,
-            multi_files=True if self.file_size else False,
-            normalize=self.normalize,
+            multi_files=True if self._file_size else False,
+            normalize=self._normalize,
             **kwargs,
         )
 
@@ -130,7 +114,146 @@ class MongoExporter:
         kwargs:
             Keyword arguments to pass to the `_prep_chunks()` and `_export()` methods.
         """
-        self._export(self._prep_chunks(**kwargs), self.file_path, **kwargs)
+        self._export(data=self._prep_chunks(**kwargs), file_path=self._file_path)
+
+
+def export_collection(
+    collection: Collection,
+    file_path: FilePath,
+    normalize: Optional[bool] = None,
+    file_size: Optional[int] = None,
+    **kwargs,
+):
+    """Exports a collection to a file.
+
+    Parameters
+    ----------
+    collection: Collection
+        The collection to export.
+    file_path: FilePath
+        The path to the file to export the data to.
+    normalize: Optional[bool] = None
+        Whether to normalize the data before exporting it. If `None`, the default value (`True`) will be used.
+    file_size: Optional[int] = None
+        The maximum size of each file to export to. If `None`, the data will be exported to a single file.
+    **kwargs: Any
+        Keyword arguments to pass to the exporter.
+
+    Examples
+    --------
+    >>> collection = client.db.my_collection
+    >>> export_collection(collection, file_path="my_collection.csv", normalize=True, file_size=1000)
+
+    This will export the collection `my_collection` to the file `my_collection.csv`,
+    split into multiple files of at most 1000 records each, with normalizing the data.
+    """
+    Exporter(file_path, file_size=file_size, normalize=normalize, **kwargs).execute(
+        data=collection.find({}), file_path=file_path, **kwargs
+    )
+
+
+def export_cursor(
+    cursor: Cursor,
+    file_path: FilePath,
+    normalize: Optional[bool] = None,
+    file_size: Optional[int] = None,
+    **kwargs,
+):
+    """Exports a cursor to a file.
+
+    Parameters
+    ----------
+    cursor: Cursor
+       The cursor to export.
+    file_path: FilePath
+       The path to the file to export the data to.
+    normalize: Optional[bool] = None
+       Whether to normalize the data before exporting it. If `None`, the default value (`True`) will be used.
+    file_size: Optional[int] = None
+       The maximum size of each file to export to. If `None`, the data will be exported to a single file.
+    **kwargs: Any
+       Keyword arguments to pass to the exporter.
+
+    Returns
+    -------
+    None
+
+    Examples
+    --------
+    >>> cursor = client.db.my_collection.find({})
+    >>> export_cursor(cursor, file_path="my_cursor.csv", normalize=True, file_size=1000)
+    This will export the cursor `cursor` to the file `my_cursor.csv`, split into multiple files of at most 1000 records
+     each, with normalizing the data.
+
+    """
+    Exporter(file_path, file_size=file_size, normalize=normalize).execute(
+        data=cursor, file_path=file_path, **kwargs
+    )
+
+
+def export_from_mongo(
+    host: str,
+    *,
+    db,
+    collection: str,
+    query: Optional[Union[MongoPipeline, MongoQuery]] = None,
+    file_path: FilePath,
+    normalize: Optional[bool] = None,
+    file_size: Optional[int] = None,
+    **kwargs: Any,
+):
+    """
+    Exports data from MongoDB to a file.
+
+    This function uses the `MongoExporter` class to export data from MongoDB to a file.
+    The exporter can export to CSV, JSON, and Parquet files.
+
+    Parameters
+    ----------
+    host: str
+        The host to connect to.
+    db: str
+        The database to use.
+    collection: str
+        The collection to export.
+    query: Optional[Union[MongoPipeline, MongoQuery]] = None
+        A query to filter the collection before exporting it. If `None`, all documents in the collection will be exported.
+    file_path: FilePath
+        The path to the file to export the data to.
+    normalize: Optional[bool] = None
+        Whether to normalize the data before exporting it. If `None`, the default value (`True`) will be used.
+    file_size: Optional[int] = None
+        The maximum size of each file to export to. If `None`, the data will be exported to a single file.
+    **kwargs: Any
+        Keyword arguments to pass to the exporter.
+
+    Returns
+    -------
+    None
+
+    Examples
+    --------
+    >>> export_from_host(
+    ...     host="localhost:27017",
+    ...     db="my_database",
+    ...     collection="my_collection",
+    ...     file_path="my_collection.csv",
+    ...     normalize=True,
+    ...     file_size=1000,
+    ... )
+
+    This will export the collection `my_collection` from the database `my_database` on the host `localhost`
+    to the file `my_collection.csv`, split into multiple files of at most 1000 records each, with normalizing the data.
+
+    """
+
+    client = MongoConnector(host, db=db)
+    query = {} if query is None else query
+    mongo_query_func: Callable = (
+        client.aggregate if isinstance(query, list) else client.find
+    )
+    cursor = mongo_query_func(collection, query)
+    export_cursor(cursor, file_path, normalize, file_size, **kwargs)
 
 
 class MongoImporter:
@@ -268,68 +391,6 @@ def list_mongo_collections(host: str, db, regex=None):
 
     client = MongoConnector(host, db=db)
     return client.list_collections(regex=regex)
-
-
-def export_from_mongo(
-    host: str,
-    *,
-    db,
-    collection: str,
-    query: Optional[Union[MongoPipeline, MongoQuery]] = None,
-    file_path: FilePath,
-    normalize: bool = True,
-    file_size: Optional[int] = None,
-    **kwargs: Any,
-):
-    """Exports data from MongoDB to a file.
-
-    This function uses the `MongoExporter` class to export data from MongoDB to a file.
-    The exporter can export to CSV, JSON, and Parquet files.
-
-    Parameters
-    ----------
-    host: str
-        The hostname or IP address of the MongoDB server.
-    db: str
-        The name of the database to export data from.
-    collection: str
-        The name of the collection to export data from.
-    query: Optional[Union[MongoPipeline, MongoQuery]]
-        A MongoDB pipeline or query to filter the data to be exported.
-    file_path: FilePath
-        The path to the file to export the data to.
-    file_size: maximum records per file:
-        The maximum number of records in single file
-    normalize: True
-        Flag to normalize data
-    kwargs: Any
-        Keyword arguments to pass to the exporter.
-
-    Example
-    ----------
-
-    ```python
-    from pymongo_export import export_from_mongo
-
-    # Export the "users" collection from the "my_database" database to a file
-    export_from_mongo(
-        host="localhost:27017,
-        db="my_database",
-        collection="users",
-        file_path="/path/to/export.csv",
-    )
-    ```
-    """
-    exporter = MongoExporter(
-        host=host,
-        db=db,
-        collection=collection,
-        query=query,
-        file_path=file_path,
-        normalize=normalize,
-        file_size=file_size,
-    )
-    exporter.execute(**kwargs)
 
 
 def import_to_mongo(
