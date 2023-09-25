@@ -6,12 +6,10 @@ from pymongo.cursor import Cursor
 from mongoie.core.readers import get_reader
 from mongoie.core.writers import get_exporter, to_mongo, write_chunks
 from mongoie.dal.mongo import MongoConnector
-from mongoie.dtypes import MongoQuery, MongoPipeline, FilePath, MongoCursor
+from mongoie.dtypes import MongoQuery, MongoPipeline, FilePath
 from mongoie.utils import (
     ChunkedDataStream,
     get_file_suffix,
-    build_file_name,
-    build_file_path,
     validate_file_path,
 )
 from mongoie.log import get_logger
@@ -20,12 +18,12 @@ from mongoie.settings import Settings
 logger = get_logger(__name__)
 
 
-class Exporter:
+class MongoExporter:
     """Exports data to a file.
 
     Examples
     --------
-    >>> exporter = Exporter(file_path="my_file.csv")
+    >>> exporter = MongoExporter(file_path="my_file.csv")
     >>> exporter.execute(data=[1, 2, 3])
 
     This will export the data `[1, 2, 3]` to the file `my_file.csv`.
@@ -147,9 +145,9 @@ def export_collection(
     This will export the collection `my_collection` to the file `my_collection.csv`,
     split into multiple files of at most 1000 records each, with normalizing the data.
     """
-    Exporter(file_path, file_size=file_size, normalize=normalize, **kwargs).execute(
-        data=collection.find({}), file_path=file_path, **kwargs
-    )
+    MongoExporter(
+        file_path, file_size=file_size, normalize=normalize, **kwargs
+    ).execute(data=collection.find({}), file_path=file_path, **kwargs)
 
 
 def export_cursor(
@@ -186,7 +184,7 @@ def export_cursor(
      each, with normalizing the data.
 
     """
-    Exporter(file_path, file_size=file_size, normalize=normalize).execute(
+    MongoExporter(file_path, file_size=file_size, normalize=normalize).execute(
         data=cursor, file_path=file_path, **kwargs
     )
 
@@ -261,25 +259,16 @@ class MongoImporter:
 
     def __init__(
         self,
-        host: str,
-        *,
-        db: str,
-        collection: str = None,
         file_path: FilePath,
         denormalized: bool = None,
         denormalization_record_prefix: str = None,
         clear_before: bool = None,
+        **kwargs: Any,
     ):
         """Initialize Mongo Importer
 
         Parameters
         ----------
-        host: str
-            The host address of the MongoDB server.
-        db: str
-            The name of the database to import to.
-        collection: str
-            The name of the collection to import tp.
         file_path: FilePath
             The path to the output file.
         denormalized: bool
@@ -290,20 +279,17 @@ class MongoImporter:
         clear_before: bool
             Flag to clear collection before import to mongo
         """
-        self.client = MongoConnector(host, db=db)
-
-        self.collection = self.client.get_collection(collection)
 
         self._file_suffix = get_file_suffix(file_path, dot=False)
-        self.file_path = validate_file_path(file_path)
-
-        self.data_reader = get_reader(self._file_suffix)
-
+        self._file_path = validate_file_path(file_path)
         self._denormalized = denormalized or Settings.DENORMALIZE_IMPORTED_DATA
         self._record_prefix = (
             denormalization_record_prefix or Settings.DENORMALIZATION_RECORD_PREFIX
         )
         self._clear_before = clear_before or Settings.CLEAR_COLLECTION_BEFORE_IMPORT
+        self.data_reader = get_reader(self._file_suffix)
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
     @staticmethod
     def _import(data, collection, **kwargs: Any):
@@ -335,17 +321,13 @@ class MongoImporter:
         kwargs:
             Keyword arguments to pass to the `_import()` method.
         """
-        logger.info(
-            f"importing data to mongo from file: {self.file_path}. using {self.data_reader.__name__} to read data and"
-            f"to_mongo to write data to Mongo(db={self.client.db.name}, coll={self.collection.name}"
-        )
         data_gen = self.data_reader(
-            self.file_path,
+            file_path=self._file_path,
             denormalized=self._denormalized,
             record_prefix=self._record_prefix,
             **kwargs,
         )
-        self._import(data_gen, self.collection, **kwargs)
+        self._import(data=data_gen, **kwargs)
 
 
 def list_mongo_databases(host: str, db: str):
@@ -391,6 +373,52 @@ def list_mongo_collections(host: str, db, regex=None):
 
     client = MongoConnector(host, db=db)
     return client.list_collections(regex=regex)
+
+
+def import_to_mongo_collection(
+    collection: Collection,
+    file_path: FilePath,
+    denormalized: bool = None,
+    denormalization_record_prefix: str = None,
+    clear_before: bool = None,
+    **kwargs,
+):
+    """Imports data from a file to a MongoDB collection.
+
+    This function uses the `MongoImporter` class to import data from a file to a MongoDB collection.
+
+    Parameters
+    ----------
+    collection: Collection
+        The MongoDB collection to import data to.
+    file_path: FilePath
+        The path to the file to import data from.
+    denormalized: Optional[bool]
+        Whether the data in the file is denormalized.
+    denormalization_record_prefix: Optional[str]
+        A prefix in denormalized file.
+    clear_before: Optional[bool]
+        Whether to clear the collection before importing data.
+    kwargs: Any
+        Keyword arguments to pass to the importer.
+
+    Example
+    ----------
+
+    ```python
+
+    client = MongoConnector(host, db="some_db")
+    my_collection = client.get_collection("my_collection")
+    # Import the data from the "users.csv" file to the "my_collection" collection
+    import_to_mongo_collection(
+        collection=my_collection,
+        file_path="users.csv",
+    )
+    ```
+    """
+    MongoImporter(
+        file_path, denormalized, denormalization_record_prefix, clear_before, **kwargs
+    ).execute(collection=collection)
 
 
 def import_to_mongo(
@@ -442,23 +470,20 @@ def import_to_mongo(
     )
     ```
     """
-    importer = MongoImporter(
-        host=host,
-        db=db,
-        collection=collection,
-        file_path=file_path,
-        denormalized=denormalized,
-        denormalization_record_prefix=denormalization_record_prefix,
-        clear_before=clear_before,
-    )
-    importer.execute(**kwargs)
+    client = MongoConnector(host, db=db)
+    coll = client.get_collection(collection)
+    MongoImporter(
+        file_path, denormalized, denormalization_record_prefix, clear_before, **kwargs
+    ).execute(collection=coll)
 
 
 __all__ = [
-    "MongoExporter",
     "MongoImporter",
     "import_to_mongo",
+    "import_to_mongo_collection",
     "export_from_mongo",
     "list_mongo_collections",
     "list_mongo_databases",
+    "export_cursor",
+    "export_collection",
 ]
