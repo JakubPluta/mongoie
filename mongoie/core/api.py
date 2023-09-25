@@ -145,6 +145,8 @@ def export_collection(
     This will export the collection `my_collection` to the file `my_collection.csv`,
     split into multiple files of at most 1000 records each, with normalizing the data.
     """
+    if not isinstance(collection, Collection):
+        raise TypeError("collection should be pymongo.collection.Collection object")
     MongoExporter(
         file_path, file_size=file_size, normalize=normalize, **kwargs
     ).execute(data=collection.find({}), file_path=file_path, **kwargs)
@@ -184,6 +186,8 @@ def export_cursor(
      each, with normalizing the data.
 
     """
+    if not isinstance(cursor, Cursor):
+        raise TypeError("cursor should by pymongo Cursor object")
     MongoExporter(file_path, file_size=file_size, normalize=normalize).execute(
         data=cursor, file_path=file_path, **kwargs
     )
@@ -416,6 +420,8 @@ def import_to_mongo_collection(
     )
     ```
     """
+    if not isinstance(collection, Collection):
+        raise TypeError("collection should be pymongo.collection.Collection object")
     MongoImporter(
         file_path, denormalized, denormalization_record_prefix, clear_before, **kwargs
     ).execute(collection=collection)

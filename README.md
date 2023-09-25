@@ -13,23 +13,23 @@ Simple Tool to export & import mongo data to/from json, csv or parquet in a lazy
 
 from mongoie.core.api import export_from_mongo
 
-host = "localhost:27017"
+mongo_uri = "localhost:27017"
 db = "some_db"
 collection = "some_collection"
 
-export_from_mongo(host, db=db, collection=collection, query={}, file_path=r".\file.json")
+export_from_mongo(mongo_uri, db=db, collection=collection, query={}, file_path=r".\file.json")
 ```
 #### To CSV
 ```python
 
 from mongoie.core.api import export_from_mongo
 
-host = "localhost:27017"
+mongo_uri = "localhost:27017"
 db = "some_db"
 collection = "some_collection"
 
 export_from_mongo(
-    host, 
+    mongo_uri, 
     db=db, 
     collection=collection, 
     query={}, 
@@ -43,12 +43,12 @@ export_from_mongo(
 
 from mongoie.core.api import export_from_mongo
 
-host = "localhost:27017"
+mongo_uri = "localhost:27017"
 db = "some_db"
 collection = "some_collection"
 
 export_from_mongo(
-    host, 
+    mongo_uri, 
     db=db, 
     collection=collection, 
     query={}, 
@@ -58,6 +58,33 @@ export_from_mongo(
 )
 ```
 
+#### other ways for exporting data
+```python
+
+from mongoie.core.api import export_cursor, export_collection
+from mongoie.dal.mongo import MongoConnector
+
+mongo_uri = "localhost:27017"
+db = "some_db"
+collection = "some_collection"
+mongo_client = MongoConnector(mongo_uri, db=db)
+coll = mongo_client.get_collection(collection)
+
+export_collection(
+    coll, 
+    file_path=r".\file.json",
+    normalize=True,       
+)
+
+cursor = coll.find({"city": {"$eq" : "London"}})
+
+export_cursor(
+    cursor,
+    file_path=r".\file.json",
+    normalize=True,  
+)
+
+```
 
 
 ### Importing data 
@@ -122,3 +149,23 @@ import_to_mongo(
 )
 ```
 
+#### Import directly to collection object
+```python
+
+from mongoie.core.api import import_to_mongo_collection
+from mongoie.dal.mongo import MongoConnector
+
+mongo_uri = "localhost:27017"
+db = "some_db"
+collection = "some_collection"
+mongo_client = MongoConnector(mongo_uri, db=db)
+coll = mongo_client.get_collection(collection)
+
+import_to_mongo_collection(
+    coll,
+    file_path=r".\file.parquet", 
+    clear_before=True, # clear collection before insert
+    denormalized=True, # if data is normalized - reverse this process
+)
+
+```

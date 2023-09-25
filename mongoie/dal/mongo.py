@@ -22,8 +22,7 @@ class MongoConnector:
 
     def __init__(
         self,
-        host: Optional[Union[str, Sequence[str]]] = None,
-        port: Optional[int] = None,
+        mongo_uri: Optional[Union[str, Sequence[str]]] = None,
         *,
         db: str,
         **kwargs,
@@ -31,14 +30,12 @@ class MongoConnector:
         """
         Parameters
         ----------
-        host: MongoDB host(s).
-        port: MongoDB port.
+        mongo_uri: MongoDB host(s).
         db: MongoDB database name.
         kwargs : additional keyword arguments
         """
         self._client = MongoClient(
-            host=host,
-            port=port,
+            host=mongo_uri,
             connect=False,  # Connect on the first operation.
             **kwargs,
         )
