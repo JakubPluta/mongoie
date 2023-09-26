@@ -11,7 +11,7 @@ Simple Tool to export & import mongo data to/from json, csv or parquet in a lazy
 #### To json
 ```python
 
-from mongoie.core.api import export_from_mongo
+from mongoie.core import export_from_mongo
 
 mongo_uri = "localhost:27017"
 db = "some_db"
@@ -22,7 +22,7 @@ export_from_mongo(mongo_uri, db=db, collection=collection, query={}, file_path=r
 #### To CSV
 ```python
 
-from mongoie.core.api import export_from_mongo
+from mongoie.core import export_from_mongo
 
 mongo_uri = "localhost:27017"
 db = "some_db"
@@ -41,7 +41,7 @@ export_from_mongo(
 #### To parquet
 ```python
 
-from mongoie.core.api import export_from_mongo
+from mongoie.core import export_from_mongo
 
 mongo_uri = "localhost:27017"
 db = "some_db"
@@ -61,7 +61,7 @@ export_from_mongo(
 #### other ways for exporting data
 ```python
 
-from mongoie.core.api import export_cursor, export_collection
+from mongoie.core import export_cursor, export_collection
 from mongoie.dal.mongo import MongoConnector
 
 mongo_uri = "localhost:27017"
@@ -92,7 +92,7 @@ export_cursor(
 #### from json
 ```python
 
-from mongoie.core.api import import_to_mongo
+from mongoie.core import import_to_mongo
 
 host = "localhost:27017"
 db = "some_db"
@@ -104,7 +104,7 @@ import_to_mongo(host, db=db, collection=collection, file_path=r".\file.json", cl
 ### from csv
 ```python
 
-from mongoie.core.api import import_to_mongo
+from mongoie.core import import_to_mongo
 
 host = "localhost:27017"
 db = "some_db"
@@ -128,14 +128,14 @@ import_to_mongo(
 ### from parquet
 ```python
 
-from mongoie.core.api import import_to_mongo
+from mongoie.core import import_to_mongo
 
-host = "localhost:27017"
+mongo_uri = "localhost:27017"
 db = "some_db"
 collection = "some_collection"
 
 import_to_mongo(
-    host, 
+    mongo_uri, 
     db=db, 
     collection=collection, 
     file_path=r".\file.parquet", 
@@ -152,7 +152,7 @@ import_to_mongo(
 #### Import directly to collection object
 ```python
 
-from mongoie.core.api import import_to_mongo_collection
+from mongoie.core import import_to_mongo_collection
 from mongoie.dal.mongo import MongoConnector
 
 mongo_uri = "localhost:27017"
@@ -168,4 +168,29 @@ import_to_mongo_collection(
     denormalized=True, # if data is normalized - reverse this process
 )
 
+```
+
+
+
+
+### importing all json files from given directory that contains `logs` in name
+```python
+
+from mongoie.core import import_to_mongo
+
+mongo_uri = "localhost:27017"
+db = "some_db"
+collection = "some_collection"
+
+import_to_mongo(
+    mongo_uri, 
+    db=db, 
+    collection=collection, 
+    dir_path=r"../data/files/", 
+    file_extension="json",
+    recursive=False,
+    pattern=r"*logs*",
+    clear_before=True,
+    denormalized=False, 
+)
 ```

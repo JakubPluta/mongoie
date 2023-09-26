@@ -4,9 +4,16 @@ from mongoie.dal.mongo import MongoConnector
 from mongoie.core.api import import_to_mongo
 
 
-TEST_DIRECTORY = os.path.join(os.getcwd(), "tests")
+TEST_DIRECTORY = os.path.join(os.getcwd())
 TEST_DATA_DIRECTORY = os.path.join(TEST_DIRECTORY, "data")
 
+
+@pytest.fixture
+def test_data_directory():
+    return TEST_DATA_DIRECTORY
+@pytest.fixture
+def test_directory():
+    return TEST_DIRECTORY
 
 @pytest.fixture
 def mongo_client():

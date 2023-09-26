@@ -1,3 +1,4 @@
+import os
 from typing import Callable, Union, Any, Optional, Iterable
 
 from pymongo.collection import Collection
@@ -7,10 +8,13 @@ from mongoie.core.readers import get_reader
 from mongoie.core.writers import get_exporter, to_mongo, write_chunks
 from mongoie.dal.mongo import MongoConnector
 from mongoie.dtypes import MongoQuery, MongoPipeline, FilePath
+from mongoie.exceptions import InvalidFilePathOrDir
 from mongoie.utils import (
     ChunkedDataStream,
     get_file_suffix,
     validate_file_path,
+    list_files,
+    get_list_of_files_with_supported_format,
 )
 from mongoie.log import get_logger
 from mongoie.settings import Settings
@@ -263,10 +267,14 @@ class MongoImporter:
 
     def __init__(
         self,
-        file_path: FilePath,
-        denormalized: bool = None,
-        denormalization_record_prefix: str = None,
-        clear_before: bool = None,
+        file_path: FilePath = None,
+        dir_path: Union[os.PathLike, str] = None,
+        file_extension: Optional[str] = None,
+        recursive: Optional[bool] = False,
+        pattern: Optional[str] = None,
+        denormalized: Optional[bool] = None,
+        denormalization_record_prefix: Optional[str] = None,
+        clear_before: Optional[bool] = None,
         **kwargs: Any,
     ):
         """Initialize Mongo Importer
@@ -284,16 +292,73 @@ class MongoImporter:
             Flag to clear collection before import to mongo
         """
 
-        self._file_suffix = get_file_suffix(file_path, dot=False)
-        self._file_path = validate_file_path(file_path)
+        if not file_path and not dir_path:
+            raise InvalidFilePathOrDir(
+                "file_path or dir_path was not provided. Please provide file_path or dir_path"
+            )
+
+        if file_path and dir_path:
+            logger.error("you provided both params file_path and dir_path")
+            raise InvalidFilePathOrDir(
+                "please provide only one parameter: either file_path or dir_path"
+            )
+
         self._denormalized = denormalized or Settings.DENORMALIZE_IMPORTED_DATA
         self._record_prefix = (
             denormalization_record_prefix or Settings.DENORMALIZATION_RECORD_PREFIX
         )
         self._clear_before = clear_before or Settings.CLEAR_COLLECTION_BEFORE_IMPORT
+
+        self._multi_files = True if dir_path else False
+
+        if self._multi_files:
+            self._files_paths: list = self._prep_files_list(
+                dir_path, file_extension, recursive, pattern
+            )
+            self._file_suffix = get_file_suffix(self._files_paths[0], dot=False)
+        else:
+            self._file_suffix = get_file_suffix(file_path, dot=False)
+            self._files_path = [validate_file_path(file_path)]
+
         self.data_reader = get_reader(self._file_suffix)
         for k, v in kwargs.items():
             setattr(self, k, v)
+
+    @staticmethod
+    def _prep_files_list(
+        dir_path: Union[str, os.PathLike],
+        file_extension: str,
+        recursive: bool,
+        pattern: str,
+    ):
+        """
+        Prepare a list of files for further processing.
+
+        This method checks if the directory exists, and if so, lists all files in
+        the directory with the specified file extension. If the recursive flag is
+        set, the method will also recursively list all files in subdirectories.
+
+        Parameters
+        ----------
+        dir_path : Union[str, os.PathLike]
+            The directory to list files in.
+        file_extension : str
+            The file extension to filter files by.
+        recursive : bool
+            Whether to recursively list files in subdirectories.
+        pattern : str
+            A regular expression pattern to filter files by.
+
+        Returns
+        -------
+        List[Union[str, os.PathLike]]
+            A list of files with the specified file extension and pattern.
+        """
+
+        files = list_files(dir_path, file_extension, recursive, pattern)
+        return get_list_of_files_with_supported_format(
+            files, ["json", "csv", "parquet"]
+        )
 
     @staticmethod
     def _import(data, collection, **kwargs: Any):
@@ -325,13 +390,15 @@ class MongoImporter:
         kwargs:
             Keyword arguments to pass to the `_import()` method.
         """
-        data_gen = self.data_reader(
-            file_path=self._file_path,
-            denormalized=self._denormalized,
-            record_prefix=self._record_prefix,
-            **kwargs,
-        )
-        self._import(data=data_gen, **kwargs)
+        for file_path in self._files_paths:
+            logger.info(f"importing {file_path} to mongo")
+            data_gen = self.data_reader(
+                file_path=file_path,
+                denormalized=self._denormalized,
+                record_prefix=self._record_prefix,
+                **kwargs,
+            )
+            self._import(data=data_gen, **kwargs)
 
 
 def list_mongo_databases(host: str, db: str):
@@ -381,7 +448,11 @@ def list_mongo_collections(host: str, db, regex=None):
 
 def import_to_mongo_collection(
     collection: Collection,
-    file_path: FilePath,
+    file_path: FilePath = None,
+    dir_path: Union[str, os.PathLike] = None,
+    file_extension: str = None,
+    recursive: bool = False,
+    pattern: str = None,
     denormalized: bool = None,
     denormalization_record_prefix: str = None,
     clear_before: bool = None,
@@ -397,6 +468,14 @@ def import_to_mongo_collection(
         The MongoDB collection to import data to.
     file_path: FilePath
         The path to the file to import data from.
+    dir_path: Union[str, os.PathLike]
+        The directory to list files in, if `file_path` is not provided.
+    file_extension: str
+        The file extension to filter files by, if `file_path` is not provided.
+    recursive: bool
+        Whether to recursively list files in subdirectories, if `file_path` is not provided.
+    pattern: str
+        A regular expression pattern to filter files by, if `file_path` is not provided.
     denormalized: Optional[bool]
         Whether the data in the file is denormalized.
     denormalization_record_prefix: Optional[str]
@@ -423,7 +502,15 @@ def import_to_mongo_collection(
     if not isinstance(collection, Collection):
         raise TypeError("collection should be pymongo.collection.Collection object")
     MongoImporter(
-        file_path, denormalized, denormalization_record_prefix, clear_before, **kwargs
+        file_path=file_path,
+        dir_path=dir_path,
+        file_extension=file_extension,
+        recursive=recursive,
+        pattern=pattern,
+        denormalized=denormalized,
+        denormalization_record_prefix=denormalization_record_prefix,
+        clear_before=clear_before,
+        **kwargs,
     ).execute(collection=collection)
 
 
@@ -432,11 +519,15 @@ def import_to_mongo(
     *,
     db: str,
     collection: str,
-    file_path: str,
-    denormalized: Optional[bool] = None,
-    denormalization_record_prefix: Optional[str] = None,
-    clear_before: Optional[bool] = None,
-    **kwargs: Any,
+    file_path: FilePath = None,
+    dir_path: Union[str, os.PathLike] = None,
+    file_extension: str = None,
+    recursive: bool = False,
+    pattern: str = None,
+    denormalized: bool = None,
+    denormalization_record_prefix: str = None,
+    clear_before: bool = None,
+    **kwargs,
 ):
     """Imports data from a file to MongoDB.
 
@@ -452,6 +543,14 @@ def import_to_mongo(
         The name of the collection to import data to.
     file_path: str
         The path to the file to import data from.
+    dir_path: Union[str, os.PathLike]
+        The directory to list files in, if `file_path` is not provided.
+    file_extension: str
+        The file extension to filter files by, if `file_path` is not provided.
+    recursive: bool
+        Whether to recursively list files in subdirectories, if `file_path` is not provided.
+    pattern: str
+        A regular expression pattern to filter files by, if `file_path` is not provided.
     denormalized: Optional[bool]
         Whether the data in the file is denormalized.
     denormalization_record_prefix: Optional[str]
@@ -474,12 +573,43 @@ def import_to_mongo(
         collection="users",
         file_path="users.csv",
     )
+
+    # Import all of the CSV files in the "data" directory to the "my_database" database, "users" collection
+    import_to_mongo(
+        host="localhost:27017",
+        db="my_database",
+        collection="users",
+        dir_path="data",
+        file_extension=".csv",
+        recursive=True,
+    )
+
+    # Import all of the JSON files in the "data" directory to the "my_database" database, "users" collection,
+    # filtering the files by the regular expression pattern "users_*.json"
+    import_to_mongo(
+        host="localhost:27017",
+        db="my_database",
+        collection="users",
+        dir_path="data",
+        file_extension=".json",
+        recursive=True,
+        pattern="users_*.json",
+    )
     ```
     """
+
     client = MongoConnector(host, db=db)
     coll = client.get_collection(collection)
     MongoImporter(
-        file_path, denormalized, denormalization_record_prefix, clear_before, **kwargs
+        file_path=file_path,
+        dir_path=dir_path,
+        file_extension=file_extension,
+        recursive=recursive,
+        pattern=pattern,
+        denormalized=denormalized,
+        denormalization_record_prefix=denormalization_record_prefix,
+        clear_before=clear_before,
+        **kwargs,
     ).execute(collection=coll)
 
 

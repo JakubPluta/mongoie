@@ -1,6 +1,7 @@
 import csv
 import dataclasses
 import itertools
+from collections import Counter
 from typing import (
     Optional,
     Union,
@@ -234,14 +235,14 @@ def add_missing_suffix(file_path: FilePath, file_extension: str) -> FilePath:
         return file_path
     return (
         f"{file_path}{file_extension}"
-        if file_path.endswith(".")
+        if file_extension.startswith(".")
         else f"{file_path}.{file_extension}"
     )
 
 
 def list_files(
     dir_path: str,
-    ext: Optional[str] = None,
+    ext: str,
     recursive: bool = False,
     pattern: Optional[str] = None,
 ) -> List[Path]:
@@ -252,7 +253,7 @@ def list_files(
     ----------
     dir_path: str
         The directory path.
-    ext: Optional[str]
+    ext: str
         The file extension to filter by.
     recursive: bool
         Whether to search recursively.
@@ -270,9 +271,7 @@ def list_files(
     )
     f: Path
     files = [f.resolve() for f in filter(os.path.isfile, paths)]
-    return (
-        list(files) if ext is None else [file for file in files if ext in file.suffix]
-    )
+    return [file for file in files if ext in file.suffix]
 
 
 def get_file_suffix(path: FilePath, dot: bool = True) -> str:
@@ -378,3 +377,58 @@ def add_number_prefix_to_file_path(
 
     p = Path(file_path)
     return Path(p.parent, f"{p.stem}_{name_suffix}{p.suffix}").resolve()
+
+
+def get_most_common_file_format(
+    files_list: List[Union[str, FilePath]], supported_formats: List = None
+) -> str:
+    """
+    Get the most common file format in a list of files.
+
+    Parameters
+    ----------
+    files_list : List[Union[str, FilePath]]
+        A list of files to check.
+    supported_formats : List = None
+        An optional list of supported file formats. If provided, only files
+        with supported formats will be considered.
+
+    Returns
+    -------
+    str
+        The most common file format in the list of files.
+
+    Raises
+    ------
+    Exception
+        If no files are found in the list.
+    """
+
+    file_suffixes = [get_file_suffix(fp, False) for fp in files_list]
+    if not file_suffixes:
+        raise Exception("no files found")
+    if supported_formats is not None:
+        file_suffixes = [x for x in file_suffixes if x in supported_formats]
+    return Counter(file_suffixes).most_common(1)[0][0]
+
+
+def get_list_of_files_with_supported_format(
+    files_list: List[Union[str, FilePath]], supported_formats: List
+):
+    """
+    Get a list of files with supported formats from a list of files.
+
+    Parameters
+    ----------
+    files_list : List[Union[str, FilePath]]
+        A list of files to check.
+    supported_formats : List
+        A list of supported file formats.
+
+    Returns
+    -------
+    List[Union[str, FilePath]]
+        A list of files with supported formats.
+    """
+
+    return [f for f in files_list if get_file_suffix(f, False) in supported_formats]
