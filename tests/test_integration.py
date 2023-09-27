@@ -1,8 +1,6 @@
 
 import pandas as pd
-import pytest
-
-from mongoie.dal._mongo import MongoConnector, MongoClient
+from pymongo import MongoClient
 from mongoie.core import (
     import_to_mongo,
     import_to_mongo_collection,
@@ -11,7 +9,6 @@ from mongoie.core import (
     export_from_mongo,
 )
 import os
-
 
 
 def test_can_instantiate_mongo_connector(mongo_client):
