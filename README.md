@@ -2,6 +2,20 @@
 
 Simple Tool to export & import mongo data to/from json, csv or parquet in a lazy way
 
+# Installation
+
+```bash
+git clone https://github.com/JakubPluta/mongoie.git
+cd mongoie
+```
+```python
+python -m venv myvenv
+python myvenv/bin/activate
+
+pip install poetry 
+poetry install
+```
+
 
 
 ## API
