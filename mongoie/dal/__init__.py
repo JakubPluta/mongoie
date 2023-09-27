@@ -1,1 +1,1 @@
-from mongoie.dal.mongo import MongoConnector
+from mongoie.dal._mongo import MongoConnector

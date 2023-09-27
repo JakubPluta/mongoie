@@ -59,10 +59,11 @@ export_from_mongo(
 ```
 
 #### other ways for exporting data
+
 ```python
 
 from mongoie.core import export_cursor, export_collection
-from mongoie.dal.mongo import MongoConnector
+from mongoie.dal._mongo import MongoConnector
 
 mongo_uri = "localhost:27017"
 db = "some_db"
@@ -71,17 +72,17 @@ mongo_client = MongoConnector(mongo_uri, db=db)
 coll = mongo_client.get_collection(collection)
 
 export_collection(
-    coll, 
+    coll,
     file_path=r".\file.json",
-    normalize=True,       
+    normalize=True,
 )
 
-cursor = coll.find({"city": {"$eq" : "London"}})
+cursor = coll.find({"city": {"$eq": "London"}})
 
 export_cursor(
     cursor,
     file_path=r".\file.json",
-    normalize=True,  
+    normalize=True,
 )
 
 ```
@@ -150,10 +151,11 @@ import_to_mongo(
 ```
 
 #### Import directly to collection object
+
 ```python
 
 from mongoie.core import import_to_mongo_collection
-from mongoie.dal.mongo import MongoConnector
+from mongoie.dal._mongo import MongoConnector
 
 mongo_uri = "localhost:27017"
 db = "some_db"
@@ -163,9 +165,9 @@ coll = mongo_client.get_collection(collection)
 
 import_to_mongo_collection(
     coll,
-    file_path=r".\file.parquet", 
-    clear_before=True, # clear collection before insert
-    denormalized=True, # if data is normalized - reverse this process
+    file_path=r".\file.parquet",
+    clear_before=True,  # clear collection before insert
+    denormalized=True,  # if data is normalized - reverse this process
 )
 
 ```

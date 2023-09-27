@@ -6,13 +6,8 @@ import pandas as pd
 from mongoie.dtypes import FilePath
 from mongoie.log import get_logger
 from pyarrow.parquet import ParquetFile
-from mongoie.utils import (
-    chunk_generator,
-    df_denormalize,
-    get_file_suffix,
-    ChunkedDataStream,
-    list_files,
-)
+from mongoie.chunky import chunk_generator
+from mongoie.utils import df_denormalize, get_file_suffix
 from mongoie.decorators import valid_file_path
 from mongoie.exceptions import InvalidFileExtension
 from mongoie.settings import Settings
@@ -42,7 +37,7 @@ def _read_json(file_path: FilePath) -> Iterator[Dict]:
 
 
 def read_json(
-    file_path: FilePath, chunk_size: int = 1000, **kwargs
+    file_path: FilePath, chunk_size: int = Settings.CHUNK_SIZE, **kwargs
 ) -> Iterator[List[Any]]:
     """
     Read a JSON file in chunks in a lazy way.
@@ -62,7 +57,9 @@ def read_json(
     yield from chunk_generator(_read_json(file_path), chunk_size)
 
 
-def _read_csv(file_path: FilePath, chunk_size: int = 1000) -> Iterable[pd.DataFrame]:
+def _read_csv(
+    file_path: FilePath, chunk_size: int = Settings.CHUNK_SIZE
+) -> Iterable[pd.DataFrame]:
     """
     Read a CSV file in chunks in a lazy way.
 
@@ -85,7 +82,7 @@ def _read_csv(file_path: FilePath, chunk_size: int = 1000) -> Iterable[pd.DataFr
 
 def read_csv(
     file_path: FilePath,
-    chunk_size: int = 1000,
+    chunk_size: int = Settings.CHUNK_SIZE,
     denormalized: bool = True,
     record_prefix: str = ".",
     **kwargs
@@ -119,7 +116,7 @@ def read_csv(
         yield chunk
 
 
-def _read_parquet(file_path: FilePath, batch_size: int = 1000):
+def _read_parquet(file_path: FilePath, batch_size: int = Settings.CHUNK_SIZE):
     """Reads a parquet file in chunks.
 
     Args:
@@ -138,7 +135,7 @@ def _read_parquet(file_path: FilePath, batch_size: int = 1000):
 
 def read_parquet(
     file_path: FilePath,
-    chunk_size: int = 1000,
+    chunk_size: int = Settings.CHUNK_SIZE,
     denormalized: bool = True,
     record_prefix: str = ".",
     **kwargs

@@ -5,10 +5,10 @@ from pymongo.collection import Collection
 
 from mongoie.dtypes import FilePath
 from mongoie.log import get_logger
+from mongoie.chunky import ChunkedDataStream, chunk_generator
 from mongoie.utils import (
     remove_last_character,
     write_closing_bracket,
-    ChunkedDataStream,
     add_number_prefix_to_file_path,
     mkdir_if_not_exists,
 )
@@ -52,7 +52,7 @@ def to_json(stream: ChunkedDataStream, file_path: FilePath, **kwargs) -> None:
 
     remove_last_character(file_path)
     write_closing_bracket(file_path)
-    logger.debug(f"{rows} documents written to {file_path}")
+    logger.info(f"{rows} documents written to {file_path}")
 
 
 def to_csv(
@@ -81,7 +81,7 @@ def to_csv(
 
     """
 
-    logger.debug(f"writing mongo data to {file_path}")
+    logger.info(f"writing mongo data to {file_path}")
     rows = 0
     stream_iterator = (
         stream.iter_as_df() if normalize is False else stream.iter_as_normalized_dfs()
@@ -99,7 +99,7 @@ def to_csv(
         )
         rows += len(df)
 
-    logger.debug(f"{rows} rows written to {file_path}")
+    logger.info(f"{rows} rows written to {file_path}")
 
 
 def to_mongo(stream: ChunkedDataStream, collection: Collection, **kwargs):
@@ -118,13 +118,13 @@ def to_mongo(stream: ChunkedDataStream, collection: Collection, **kwargs):
     Returns:
         None
     """
-    logger.debug(f"writing json data to {collection.name}")
+    logger.info(f"writing json data to {collection.name}")
     rows = 0
     for chunk_idx, chunk in enumerate(stream):
         rows += len(chunk)
         logger.debug(f"writing idx: {chunk_idx} with {len(chunk)} documents")
         collection.insert_many(chunk, **kwargs)
-    logger.debug(f"{rows} rows written to {collection.name}")
+    logger.info(f"{rows} rows written to {collection.name}")
 
 
 def to_parquet(
@@ -150,7 +150,7 @@ def to_parquet(
         None
 
     """
-    logger.debug(f"writing mongo data to {file_path}")
+    logger.info(f"writing mongo data to {file_path}")
     rows = 0
     stream_iterator = (
         stream.iter_as_df() if normalize is False else stream.iter_as_normalized_dfs()
@@ -165,14 +165,14 @@ def to_parquet(
             append=append,
             **kwargs,
         )
-    logger.debug(f"{rows} rows written to {file_path}")
+    logger.info(f"{rows} rows written to {file_path}")
 
 
 def write_chunks(
     data: ChunkedDataStream,
     writer_func: Callable,
     file_path: FilePath,
-    chunk_size: int = 1000,
+    chunk_size: int = Settings.CHUNK_SIZE,
     multi_files: bool = False,
     **kwargs: Any,
 ):

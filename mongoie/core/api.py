@@ -6,11 +6,11 @@ from pymongo.cursor import Cursor
 
 from mongoie.core.readers import get_reader
 from mongoie.core.writers import get_exporter, to_mongo, write_chunks
-from mongoie.dal.mongo import MongoConnector
+from mongoie.dal import MongoConnector
 from mongoie.dtypes import MongoQuery, MongoPipeline, FilePath
 from mongoie.exceptions import InvalidFilePathOrDir
+from mongoie.chunky import ChunkedDataStream, chunk_generator
 from mongoie.utils import (
-    ChunkedDataStream,
     get_file_suffix,
     validate_file_path,
     list_files,
@@ -47,7 +47,8 @@ class MongoExporter:
         file_path: FilePath
             The path to the file to export the data to.
         file_size: Optional[int] = None
-            The maximum size of each file to export to. If `None`, the data will be exported to a single file.
+            The maximum size of each file to export to. If `None`,
+            the data will be exported to a single file.
         normalize: bool = True
             Whether to normalize the data before exporting it.
         **kwargs: Any
@@ -135,16 +136,19 @@ def export_collection(
     file_path: FilePath
         The path to the file to export the data to.
     normalize: Optional[bool] = None
-        Whether to normalize the data before exporting it. If `None`, the default value (`True`) will be used.
+        Whether to normalize the data before exporting it. If `None`,
+        the default value (`True`) will be used.
     file_size: Optional[int] = None
-        The maximum size of each file to export to. If `None`, the data will be exported to a single file.
+        The maximum size of each file to export to. If `None`,
+        the data will be exported to a single file.
     **kwargs: Any
         Keyword arguments to pass to the exporter.
 
     Examples
     --------
     >>> collection = client.db.my_collection
-    >>> export_collection(collection, file_path="my_collection.csv", normalize=True, file_size=1000)
+    >>> export_collection(collection, file_path="my_collection.csv",
+    normalize=True, file_size=1000)
 
     This will export the collection `my_collection` to the file `my_collection.csv`,
     split into multiple files of at most 1000 records each, with normalizing the data.
@@ -198,7 +202,7 @@ def export_cursor(
 
 
 def export_from_mongo(
-    host: str,
+    mongo_uri: str,
     *,
     db,
     collection: str,
@@ -216,20 +220,23 @@ def export_from_mongo(
 
     Parameters
     ----------
-    host: str
+    mongo_uri: str
         The host to connect to.
     db: str
         The database to use.
     collection: str
         The collection to export.
     query: Optional[Union[MongoPipeline, MongoQuery]] = None
-        A query to filter the collection before exporting it. If `None`, all documents in the collection will be exported.
+        A query to filter the collection before exporting it. If `None`,
+        all documents in the collection will be exported.
     file_path: FilePath
         The path to the file to export the data to.
     normalize: Optional[bool] = None
-        Whether to normalize the data before exporting it. If `None`, the default value (`True`) will be used.
+        Whether to normalize the data before exporting it. If `None`,
+        the default value (`True`) will be used.
     file_size: Optional[int] = None
-        The maximum size of each file to export to. If `None`, the data will be exported to a single file.
+        The maximum size of each file to export to. If `None`,
+        the data will be exported to a single file.
     **kwargs: Any
         Keyword arguments to pass to the exporter.
 
@@ -240,7 +247,7 @@ def export_from_mongo(
     Examples
     --------
     >>> export_from_host(
-    ...     host="localhost:27017",
+    ...     mongo_uri="localhost:27017",
     ...     db="my_database",
     ...     collection="my_collection",
     ...     file_path="my_collection.csv",
@@ -248,17 +255,18 @@ def export_from_mongo(
     ...     file_size=1000,
     ... )
 
-    This will export the collection `my_collection` from the database `my_database` on the host `localhost`
-    to the file `my_collection.csv`, split into multiple files of at most 1000 records each, with normalizing the data.
+    This will export the collection `my_collection` from the database `my_database`
+    on the host `localhost`to the file `my_collection.csv`,
+    split into multiple files of at most 1000 records each, with normalizing the data.
 
     """
 
-    client = MongoConnector(host, db=db)
+    client = MongoConnector(mongo_uri)
     query = {} if query is None else query
     mongo_query_func: Callable = (
         client.aggregate if isinstance(query, list) else client.find
     )
-    cursor = mongo_query_func(collection, query)
+    cursor = mongo_query_func(db, collection, query)
     export_cursor(cursor, file_path, normalize, file_size, **kwargs)
 
 
@@ -318,7 +326,7 @@ class MongoImporter:
             self._file_suffix = get_file_suffix(self._files_paths[0], dot=False)
         else:
             self._file_suffix = get_file_suffix(file_path, dot=False)
-            self._files_path = [validate_file_path(file_path)]
+            self._files_paths = [validate_file_path(file_path)]
 
         self.data_reader = get_reader(self._file_suffix)
         for k, v in kwargs.items():
@@ -401,15 +409,13 @@ class MongoImporter:
             self._import(data=data_gen, **kwargs)
 
 
-def list_mongo_databases(host: str, db: str):
+def list_mongo_databases(mongo_uri: str):
     """List all MongoDB databases on the given host.
 
     Parameters
     ----------
-    host : str
+    mongo_uri : str
         The hostname or IP address of the MongoDB server.
-    db : str
-        The name of the database to connect to.
 
     Returns
     -------
@@ -418,16 +424,16 @@ def list_mongo_databases(host: str, db: str):
 
     """
 
-    client = MongoConnector(host, db=db)
-    return client.list_dbs()
+    client = MongoConnector(mongo_uri)
+    return client.list_database_names()
 
 
-def list_mongo_collections(host: str, db, regex=None):
+def list_mongo_collections(mongo_uri: str, db: str, regex=None):
     """List all MongoDB collections on the given host, matching the given criteria.
 
     Parameters
     ----------
-    host : str
+    mongo_uri : str
         The hostname or IP address of the MongoDB server.
     db : str
         The name of the database to list collections from.
@@ -442,8 +448,8 @@ def list_mongo_collections(host: str, db, regex=None):
 
     """
 
-    client = MongoConnector(host, db=db)
-    return client.list_collections(regex=regex)
+    client = MongoConnector(mongo_uri)
+    return client.list_collections(db, regex=regex)
 
 
 def import_to_mongo_collection(
@@ -515,7 +521,7 @@ def import_to_mongo_collection(
 
 
 def import_to_mongo(
-    host: str,
+    mongo_uri: str,
     *,
     db: str,
     collection: str,
@@ -535,7 +541,7 @@ def import_to_mongo(
 
     Parameters
     ----------
-    host: str
+    mongo_uri: str
         The hostname or IP address of the MongoDB server.
     db: str
         The name of the database to import data to.
@@ -568,15 +574,16 @@ def import_to_mongo(
 
     # Import the data from the "users.csv" file to the "my_database" database, "users" collection
     import_to_mongo(
-        host="localhost:27017",
+        mongo_uri="localhost:27017",
         db="my_database",
         collection="users",
         file_path="users.csv",
     )
 
-    # Import all of the CSV files in the "data" directory to the "my_database" database, "users" collection
+    # Import all of the CSV files in the "data" directory to the
+    "my_database" database, "users" collection
     import_to_mongo(
-        host="localhost:27017",
+        mongo_uri="localhost:27017",
         db="my_database",
         collection="users",
         dir_path="data",
@@ -584,10 +591,11 @@ def import_to_mongo(
         recursive=True,
     )
 
-    # Import all of the JSON files in the "data" directory to the "my_database" database, "users" collection,
+    # Import all of the JSON files in the "data" directory to the
+     "my_database" database, "users" collection,
     # filtering the files by the regular expression pattern "users_*.json"
     import_to_mongo(
-        host="localhost:27017",
+        mongo_uri="localhost:27017",
         db="my_database",
         collection="users",
         dir_path="data",
@@ -598,8 +606,8 @@ def import_to_mongo(
     ```
     """
 
-    client = MongoConnector(host, db=db)
-    coll = client.get_collection(collection)
+    client = MongoConnector(mongo_uri)
+    coll = client.get_collection(db, collection)
     MongoImporter(
         file_path=file_path,
         dir_path=dir_path,

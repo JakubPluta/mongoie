@@ -83,15 +83,4 @@ def mkdir_decorator(func: Callable) -> Callable:
     return wrapper
 
 
-def inject_writer(func):
-    @functools.wraps(func)
-    def inner(*args, **kwargs):
-        result = func(*args, **kwargs)
-        _writer = partial(write_chunks, data=result)
-        setattr(result, "export", _writer)
-        return result
-
-    return inner
-
-
 __all__ = ["valid_file_path", "mkdir_decorator"]
