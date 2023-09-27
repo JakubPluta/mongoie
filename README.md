@@ -11,10 +11,18 @@ cd mongoie
 ```python
 python -m venv myvenv
 python myvenv/bin/activate
+pip install mongoie
+```
+or
+```python
+python -m venv myvenv
+python myvenv/bin/activate
 
 pip install poetry 
 poetry install
 ```
+
+
 
 
 
