@@ -2,7 +2,7 @@
 
 Simple Tool to export & import mongo data to/from json, csv or parquet in a lazy way
 
-# Installation
+## Installation
 
 ```bash
 git clone https://github.com/JakubPluta/mongoie.git
@@ -21,12 +21,6 @@ python myvenv/bin/activate
 pip install poetry 
 poetry install
 ```
-
-
-
-
-
-## API
 
 ### Exporting data
 
@@ -109,7 +103,6 @@ export_cursor(
 
 ```
 
-
 ### Importing data 
 
 #### from json
@@ -124,7 +117,7 @@ collection = "some_collection"
 import_to_mongo(mongo_uri, db=db, collection=collection, file_path=r".\file.json", clear_before=True)
 ```
 
-### from csv
+#### from csv
 ```python
 
 from mongoie.core import import_to_mongo
@@ -148,7 +141,7 @@ import_to_mongo(
 )
 ```
 
-### from parquet
+#### from parquet
 ```python
 
 from mongoie.core import import_to_mongo
@@ -195,9 +188,7 @@ import_to_mongo_collection(
 ```
 
 
-
-
-### importing all json files from given directory that contains `logs` in name
+#### importing all json files from given directory that contains `logs` in name
 ```python
 
 from mongoie.core import import_to_mongo
