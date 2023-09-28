@@ -85,13 +85,13 @@ export_from_mongo(
 ```python
 
 from mongoie.core import export_cursor, export_collection
-from mongoie.dal._mongo import MongoConnector
+from mongoie.dal import MongoConnector
 
 mongo_uri = "localhost:27017"
 db = "some_db"
 collection = "some_collection"
-mongo_client = MongoConnector(mongo_uri, db=db)
-coll = mongo_client.get_collection(collection)
+mongo_client = MongoConnector(mongo_uri,)
+coll = mongo_client.get_collection(db, collection)
 
 export_collection(
     coll,
@@ -117,11 +117,11 @@ export_cursor(
 
 from mongoie.core import import_to_mongo
 
-host = "localhost:27017"
+mongo_uri = "localhost:27017"
 db = "some_db"
 collection = "some_collection"
 
-import_to_mongo(host, db=db, collection=collection, file_path=r".\file.json", clear_before=True)
+import_to_mongo(mongo_uri, db=db, collection=collection, file_path=r".\file.json", clear_before=True)
 ```
 
 ### from csv
@@ -129,12 +129,12 @@ import_to_mongo(host, db=db, collection=collection, file_path=r".\file.json", cl
 
 from mongoie.core import import_to_mongo
 
-host = "localhost:27017"
+mongo_uri = "localhost:27017"
 db = "some_db"
 collection = "some_collection"
 
 import_to_mongo(
-    host, 
+    mongo_uri, 
     db=db, 
     collection=collection, 
     file_path=r".\file.csv", 
@@ -177,13 +177,13 @@ import_to_mongo(
 ```python
 
 from mongoie.core import import_to_mongo_collection
-from mongoie.dal._mongo import MongoConnector
+from mongoie.dal import MongoConnector
 
 mongo_uri = "localhost:27017"
 db = "some_db"
 collection = "some_collection"
-mongo_client = MongoConnector(mongo_uri, db=db)
-coll = mongo_client.get_collection(collection)
+mongo_client = MongoConnector(mongo_uri)
+coll = mongo_client.get_collection(db, collection)
 
 import_to_mongo_collection(
     coll,
